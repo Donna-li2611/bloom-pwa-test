@@ -1275,8 +1275,8 @@ h2 {
   }
 
   .habit-card {
-    grid-template-columns: 42px minmax(0, 1fr) 42px;
-    gap: 10px;
+    grid-template-columns: 42px minmax(76px, 92px) minmax(0, 1fr) 42px;
+    gap: 7px;
     padding-right: 12px;
     padding-left: 12px;
   }
@@ -1288,7 +1288,20 @@ h2 {
   }
 
   .habit-ratio {
-    font-size: 14px;
+    font-size: 11px;
+  }
+
+  .habit-identity .habit-name {
+    font-size: 17px;
+  }
+
+  .progress-track {
+    margin-top: 0;
+  }
+
+  .habit-detail {
+    font-size: 10px;
+    line-height: 1.25;
   }
 
   .managed-habit {
