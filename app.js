@@ -1,0 +1,1192 @@
+(() => {
+  const STORAGE_KEY = 'bloom-prototype-v02-r2';
+  const weekdayKeys = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+  const bedtimeHistory = ['23:18', '23:42', '23:25', '23:08', '23:51', '23:22', '23:42'];
+  const wakeHistory = ['06:54', '07:12', '06:48', '06:58', '07:18', '06:51', '06:52'];
+  const weightHistory = [71.2, 71.0, 71.1, 70.9, 70.8, 70.9, 70.8];
+
+  const copy = {
+    zh: {
+      prototype: '模拟数据原型',
+      greeting: '早上好',
+      morningGreeting: '早上好',
+      afternoonGreeting: '下午好',
+      eveningGreeting: '晚上好',
+      today: '今天',
+      review: '复盘',
+      statistics: '统计',
+      footprints: '足迹',
+      habits: '习惯',
+      weeklyReview: '本周复盘',
+      planAndActual: '计划与实际',
+      bedtime: '入睡时间',
+      sleepSchedule: '起床与入睡时间',
+      actualBedtime: '实际入睡',
+      actualWake: '实际起床',
+      plannedBedtime: '计划 23:30',
+      habitProgress: '习惯进度',
+      weeklyOverview: '本周打卡',
+      checkinCalendar: '打卡记录',
+      recordAndPlan: '● 已记录 · ✓ 按计划',
+      week: '周', month: '月', quarter: '季', year: '年',
+      periodNames: { week: '本周', month: '本月', quarter: '本季度', year: '今年' },
+      weightTrend: '体重趋势',
+      futureHealthData: '未来可通过 IoT 加入体脂率、BMI 等身体数据',
+      noData: '暂无记录',
+      nextWeek: '下周可以试试',
+      record: '记录',
+      saveRecord: '保存记录',
+      manageHabits: '管理习惯',
+      myHabits: '我的习惯',
+      manageHabitsHint: '用简单的名称表达习惯，把频率和记录方式交给 Bloom。',
+      newHabit: '新习惯',
+      whatToKeep: '你想坚持什么？',
+      habitName: '习惯名称',
+      chooseIcon: '选择图标',
+      quantify: '记录具体数据',
+      quantifyHint: '例如时长、页数、时间或数值',
+      whatToRecord: '想记录什么？',
+      enterValue: '记录数值',
+      duration: '时长',
+      count: '次数',
+      number: '数值',
+      time: '时间',
+      target: '计划',
+      unit: '单位',
+      frequency: '多久一次？',
+      everyDay: '每天',
+      selectedDays: '每周指定',
+      timesPerWeek: '每周几次',
+      everyNDays: '每隔几天',
+      chooseDays: '选择星期',
+      weeklyCount: '每周完成几次？',
+      intervalDays: '每隔几天？',
+      createHabit: '创建习惯',
+      editHabit: '编辑习惯',
+      saveChanges: '保存修改',
+      optionalContent: '打卡时可以添加',
+      addNotes: '打卡时可以添加备注',
+      addNotesHint: '支持文字、图片和语音输入',
+      textNote: '文字备注',
+      photo: '图片',
+      voice: '语音',
+      futurePhotoAi: '未来可让 AI 识别图片并生成文字描述',
+      futureAiIcon: '未来可以用一句描述让 AI 生成专属图标',
+      notePlaceholder: '写下一点感受或补充…',
+      choosePhoto: '选择图片',
+      voicePrototype: '点击模拟语音输入',
+      voiceAdded: '已加入一段模拟语音文字',
+      dragHint: '拖动调整顺序',
+      recordedSummary: (recorded, total) => `${recorded} / ${total} 已记录`,
+      weekSummary: (done, total) => `${done} / ${total} 天按计划`,
+      reviewSummary: (rate) => `本周按照计划完成 ${rate}%。记录本身也会保留，即使当天没有达到目标。`,
+      suggestion: '把两天的入睡时间提前15分钟；运动再完成1次，就能达到本周计划。',
+      actualPlan: (actual, plan) => `实际 ${actual} · 计划 ${plan}`,
+      planActual: (plan, actual) => `计划 ${plan} · 实际 ${actual}`,
+      weekMinutes: (actual, target) => `本周 ${actual} / ${target} 分钟`,
+      todayReading: (minutes, pages) => `今天 ${minutes} 分钟 · ${pages} 页`,
+      weightDetail: (value, change) => `今天 ${value} kg · 最近7天 ${change} kg`,
+      dailyFrequency: '每天',
+      selectedFrequency: (days) => `每周 ${days}`,
+      weeklyFrequency: (count) => `每周 ${count} 次`,
+      intervalFrequency: (days) => `每隔 ${days} 天`,
+      simpleCheckin: '点击即可完成',
+      quantified: (label) => `记录${label}`,
+      saved: '记录已保存',
+      habitCreated: '新习惯已加入原型',
+      habitUpdated: '习惯配置已更新',
+      timeLabel: '实际时间',
+      plannedTime: (time) => `计划时间：${time}`,
+      minutes: '分钟',
+      pages: '页数',
+      activity: '运动类型',
+      activityOptions: ['快走', '跑步', '力量训练', '瑜伽', '其他'],
+      weight: '体重（kg）',
+      quality: '睡眠质量（可选）',
+      qualityOptions: ['不记录', '很好', '还不错', '一般', '较差'],
+      completedToday: '今天已完成',
+      tapToComplete: '点击完成今天的打卡',
+      mon: '一', tue: '二', wed: '三', thu: '四', fri: '五', sat: '六', sun: '日',
+      dayNames: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
+      metricLabels: { duration: '时长', count: '次数', number: '数值', time: '时间' },
+      trackingLabels: {
+        sleep: '记录时间', wake: '记录时间', workout: '记录时长', reading: '记录时长和页数', weight: '记录数值', footbath: '点击完成',
+      },
+      habitNames: {
+        sleep: '睡眠', wake: '起床', workout: '运动', reading: '阅读', weight: '体重记录', footbath: '泡脚',
+      },
+    },
+    en: {
+      prototype: 'Sample data prototype',
+      greeting: 'Good morning',
+      morningGreeting: 'Good morning',
+      afternoonGreeting: 'Good afternoon',
+      eveningGreeting: 'Good evening',
+      today: 'Today',
+      review: 'Review',
+      statistics: 'Stats',
+      footprints: 'Footprints',
+      habits: 'Habits',
+      weeklyReview: 'Weekly review',
+      planAndActual: 'Plan and actual',
+      bedtime: 'Bedtime',
+      sleepSchedule: 'Wake and bedtime',
+      actualBedtime: 'Actual bedtime',
+      actualWake: 'Actual wake time',
+      plannedBedtime: 'Plan 23:30',
+      habitProgress: 'Habit progress',
+      weeklyOverview: 'This week',
+      checkinCalendar: 'Check-in history',
+      recordAndPlan: '● recorded · ✓ on plan',
+      week: 'Week', month: 'Month', quarter: 'Quarter', year: 'Year',
+      periodNames: { week: 'This week', month: 'This month', quarter: 'This quarter', year: 'This year' },
+      weightTrend: 'Weight trend',
+      futureHealthData: 'IoT may add body fat, BMI, and other body data later',
+      noData: 'No records yet',
+      nextWeek: 'Try this next week',
+      record: 'Record',
+      saveRecord: 'Save record',
+      manageHabits: 'Manage habits',
+      myHabits: 'My habits',
+      manageHabitsHint: 'Name the habit simply. Let Bloom handle tracking and frequency.',
+      newHabit: 'New habit',
+      whatToKeep: 'What would you like to keep doing?',
+      habitName: 'Habit name',
+      chooseIcon: 'Choose an icon',
+      quantify: 'Track a value',
+      quantifyHint: 'Such as duration, pages, time, or a number',
+      whatToRecord: 'What do you want to track?',
+      enterValue: 'Enter value',
+      duration: 'Duration',
+      count: 'Count',
+      number: 'Number',
+      time: 'Time',
+      target: 'Plan',
+      unit: 'Unit',
+      frequency: 'How often?',
+      everyDay: 'Every day',
+      selectedDays: 'Selected days',
+      timesPerWeek: 'Times per week',
+      everyNDays: 'Every N days',
+      chooseDays: 'Choose weekdays',
+      weeklyCount: 'How many times each week?',
+      intervalDays: 'How many days apart?',
+      createHabit: 'Create habit',
+      editHabit: 'Edit habit',
+      saveChanges: 'Save changes',
+      optionalContent: 'Optional check-in content',
+      addNotes: 'Add notes at check-in',
+      addNotesHint: 'Text, photo, and voice in one place',
+      textNote: 'Text note',
+      photo: 'Photo',
+      voice: 'Voice',
+      futurePhotoAi: 'AI may turn a photo into a text description later',
+      futureAiIcon: 'Describe an idea to generate a personal AI icon later',
+      notePlaceholder: 'Add a feeling or detail…',
+      choosePhoto: 'Choose photo',
+      voicePrototype: 'Simulate voice input',
+      voiceAdded: 'A simulated voice transcript was added',
+      dragHint: 'Drag to reorder',
+      recordedSummary: (recorded, total) => `${recorded} / ${total} recorded`,
+      weekSummary: (done, total) => `${done} / ${total} days on plan`,
+      reviewSummary: (rate) => `You followed ${rate}% of this week’s plan. Records remain visible even when a target was not reached.`,
+      suggestion: 'Move two bedtimes 15 minutes earlier; one more workout will complete the weekly plan.',
+      actualPlan: (actual, plan) => `Actual ${actual} · plan ${plan}`,
+      planActual: (plan, actual) => `Plan ${plan} · actual ${actual}`,
+      weekMinutes: (actual, target) => `${actual} / ${target} min this week`,
+      todayReading: (minutes, pages) => `${minutes} min · ${pages} pages today`,
+      weightDetail: (value, change) => `${value} kg today · ${change} kg over 7 days`,
+      dailyFrequency: 'Every day',
+      selectedFrequency: (days) => `Weekly · ${days}`,
+      weeklyFrequency: (count) => `${count} times weekly`,
+      intervalFrequency: (days) => `Every ${days} days`,
+      simpleCheckin: 'Tap to complete',
+      quantified: (label) => `Track ${label}`,
+      saved: 'Record saved',
+      habitCreated: 'New habit added to the prototype',
+      habitUpdated: 'Habit settings updated',
+      timeLabel: 'Actual time',
+      plannedTime: (time) => `Planned time: ${time}`,
+      minutes: 'Minutes',
+      pages: 'Pages',
+      activity: 'Activity',
+      activityOptions: ['Walk', 'Run', 'Strength', 'Yoga', 'Other'],
+      weight: 'Weight (kg)',
+      quality: 'Sleep quality (optional)',
+      qualityOptions: ['Do not record', 'Great', 'Good', 'Fair', 'Poor'],
+      completedToday: 'Completed today',
+      tapToComplete: 'Tap to complete today',
+      mon: 'M', tue: 'T', wed: 'W', thu: 'T', fri: 'F', sat: 'S', sun: 'S',
+      dayNames: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+      metricLabels: { duration: 'duration', count: 'count', number: 'number', time: 'time' },
+      trackingLabels: {
+        sleep: 'Track time', wake: 'Track time', workout: 'Track duration', reading: 'Track time and pages', weight: 'Track value', footbath: 'Tap to complete',
+      },
+      habitNames: {
+        sleep: 'Sleep', wake: 'Wake up', workout: 'Workout', reading: 'Reading', weight: 'Weight log', footbath: 'Foot bath',
+      },
+    },
+  };
+
+  const initialHabits = [
+    {
+      id: 'sleep', icon: 'sleep', kind: 'time', target: '23:30', actual: '23:42', recorded: true, complete: false,
+      weekDone: 4, weekTarget: 7, frequency: { type: 'daily' }, recordOptions: { text: false, photo: false, voice: false },
+      weekStates: ['complete', 'recorded', 'complete', 'complete', 'recorded', 'complete', 'recorded'],
+    },
+    {
+      id: 'wake', icon: 'wake', kind: 'time', target: '07:00', actual: '06:52', recorded: true, complete: true,
+      weekDone: 5, weekTarget: 7, frequency: { type: 'daily' }, recordOptions: { text: false, photo: false, voice: false },
+      weekStates: ['complete', 'complete', 'complete', 'recorded', 'complete', 'complete', 'none'],
+    },
+    {
+      id: 'workout', icon: 'workout', kind: 'workout', target: 3, actual: 2, minutes: 95, minuteTarget: 150,
+      recorded: false, complete: false, weekDone: 2, weekTarget: 3, frequency: { type: 'weekly', count: 3 }, recordOptions: { text: true, photo: true, voice: false },
+      weekStates: ['none', 'complete', 'none', 'none', 'complete', 'none', 'none'],
+    },
+    {
+      id: 'reading', icon: 'reading', kind: 'reading', target: 30, minutes: 18, pages: 12,
+      recorded: true, complete: false, weekDone: 4, weekTarget: 7, frequency: { type: 'daily' }, recordOptions: { text: true, photo: true, voice: true },
+      weekStates: ['complete', 'complete', 'recorded', 'complete', 'complete', 'none', 'recorded'],
+    },
+    {
+      id: 'weight', icon: 'weight', kind: 'weight', value: 70.8, change: -0.3,
+      recorded: true, complete: true, weekDone: 7, weekTarget: 7, frequency: { type: 'daily' }, recordOptions: { text: false, photo: false, voice: false },
+      weekStates: ['complete', 'complete', 'complete', 'complete', 'complete', 'complete', 'complete'],
+    },
+    {
+      id: 'footbath', icon: 'footbath', kind: 'boolean', recorded: false, complete: false,
+      weekDone: 3, weekTarget: 4, frequency: { type: 'weekly', count: 4 }, recordOptions: { text: true, photo: false, voice: false },
+      weekStates: ['complete', 'none', 'complete', 'none', 'complete', 'none', 'none'],
+    },
+  ];
+
+  const cloneInitialState = () => ({
+    language: 'zh',
+    habits: initialHabits.map((habit) => ({
+      ...habit,
+      weekStates: [...habit.weekStates],
+      frequency: { ...habit.frequency },
+      recordOptions: { ...habit.recordOptions },
+    })),
+  });
+
+  const loadState = () => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      if (parsed?.habits?.length) {
+        parsed.habits = parsed.habits.map((habit) => ({
+          ...habit,
+          recordOptions: habit.recordOptions || { text: false, photo: false, voice: false },
+        }));
+        return parsed;
+      }
+    } catch {}
+    return cloneInitialState();
+  };
+
+  let state = loadState();
+  let activeHabitId = null;
+  let selectedIcon = 'sprout';
+  let selectedFrequency = 'daily';
+  let reviewPeriod = 'week';
+  let reviewOffset = 0;
+  let draggedHabitId = null;
+  let pendingDeleteHabitId = null;
+  let toastTimer = null;
+
+  const elements = {
+    habitList: document.getElementById('habit-list'),
+    managedHabitList: document.getElementById('managed-habit-list'),
+    weekMatrix: document.getElementById('week-matrix'),
+    sleepChart: document.getElementById('sleep-chart'),
+    weightChart: document.getElementById('weight-chart'),
+    sheet: document.getElementById('checkin-sheet'),
+    habitSheet: document.getElementById('habit-sheet'),
+    scrim: document.getElementById('scrim'),
+    fields: document.getElementById('checkin-fields'),
+    result: document.getElementById('checkin-result'),
+    toast: document.getElementById('toast'),
+  };
+
+  const t = () => copy[state.language];
+  const persist = () => localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  const ratio = (habit) => Math.min(1, habit.weekDone / Math.max(1, habit.weekTarget));
+  const habitName = (habit) => habit.name || t().habitNames[habit.id] || '';
+  const legacyIcons = {
+    '🌙': 'sleep', '🌅': 'wake', '☀️': 'wake', '🏃': 'workout', '📖': 'reading',
+    '⚖️': 'weight', '🛁': 'footbath', '🧘': 'meditation', '💧': 'water', '🌱': 'sprout',
+  };
+  const iconKey = (value) => legacyIcons[value] || value || 'sprout';
+  const fallbackColors = ['#f2a928', '#ef7661', '#d979a7', '#9f87d8', '#6f9ed8', '#68b9c7', '#78a766', '#b6a35c', '#a97856', '#73776f'];
+  const iconShapes = {
+    sleep: '<rect x="12" y="37" width="40" height="14" rx="7" fill="#9ec8e8"/><path d="M38 11c-12 3-16 20-5 27 7 5 17 1 20-7-12 4-22-8-15-20Z" fill="#ffc14d"/><path d="M38 11c-12 3-16 20-5 27 7 5 17 1 20-7-12 4-22-8-15-20Z" fill="none" stroke="#63391f" stroke-width="3.5" stroke-linejoin="round"/><path d="M17 44h30" stroke="#63391f" stroke-width="3" stroke-linecap="round"/>',
+    wake: '<path d="M10 47h44" stroke="#63391f" stroke-width="3.5" stroke-linecap="round"/><path d="M18 46a14 14 0 0 1 28 0" fill="#ffc14d" stroke="#63391f" stroke-width="3.5"/><path d="M32 12v7M13 31H7m50 0h-6M18 18l5 5m23-5-5 5" stroke="#ee8d2b" stroke-width="4" stroke-linecap="round"/>',
+    workout: '<path d="M10 39c8-1 13-8 16-18l8 11 17 7c4 2 5 8 1 11H20c-7 0-11-4-10-11Z" fill="#76b9df" stroke="#63391f" stroke-width="3.5" stroke-linejoin="round"/><path d="M31 31l7-7m-2 11 7-6M14 44h38" stroke="#fff8e9" stroke-width="3" stroke-linecap="round"/>',
+    reading: '<path d="M8 17c9-3 17-1 24 5v29c-7-6-15-8-24-5V17Zm48 0c-9-3-17-1-24 5v29c7-6 15-8 24-5V17Z" fill="#fff7dd" stroke="#63391f" stroke-width="3.5" stroke-linejoin="round"/><path d="M32 22v29" stroke="#63391f" stroke-width="3"/><path d="M43 13v17l5-4 5 4V12" fill="#86a768" stroke="#63391f" stroke-width="3" stroke-linejoin="round"/>',
+    weight: '<rect x="10" y="12" width="44" height="42" rx="12" fill="#9ab37b" stroke="#63391f" stroke-width="3.5"/><path d="M21 20h22l-3 15H24l-3-15Z" fill="#fff7dd" stroke="#63391f" stroke-width="3"/><path d="M32 24v7" stroke="#ee8d2b" stroke-width="3" stroke-linecap="round"/><path d="M20 45h4m16 0h4" stroke="#63391f" stroke-width="3" stroke-linecap="round"/>',
+    footbath: '<path d="M9 33h46l-5 19H14L9 33Z" fill="#83c7e1" stroke="#63391f" stroke-width="3.5" stroke-linejoin="round"/><path d="M21 14c-5 7 4 8-1 15m13-15c-5 7 4 8-1 15m13-15c-5 7 4 8-1 15" fill="none" stroke="#ee8d2b" stroke-width="3" stroke-linecap="round"/><path d="M18 38c5 4 23 4 28 0" fill="none" stroke="#fff8e9" stroke-width="3" stroke-linecap="round"/>',
+    sprout: '<path d="M32 52V28" stroke="#63391f" stroke-width="4" stroke-linecap="round"/><path d="M31 31C18 31 13 23 14 14c11-1 19 5 17 17Zm2 1c13 0 19-8 18-18-11-1-20 6-18 18Z" fill="#8eaa69" stroke="#63391f" stroke-width="3.5" stroke-linejoin="round"/><path d="M20 53h24" stroke="#ee8d2b" stroke-width="4" stroke-linecap="round"/>',
+    meditation: '<circle cx="32" cy="16" r="7" fill="#ffc14d" stroke="#63391f" stroke-width="3.5"/><path d="M32 24v14m0-8-12 8m12-8 12 8M17 49c6-7 11-9 15-5 4-4 9-2 15 5-9 5-21 5-30 0Z" fill="#b9a5d8" stroke="#63391f" stroke-width="3.5" stroke-linejoin="round"/>',
+    water: '<path d="M16 12h32l-4 42H20l-4-42Z" fill="#dff4f8" stroke="#63391f" stroke-width="3.5" stroke-linejoin="round"/><path d="M20 31c8-4 16 4 25 0l-2 20H21l-1-20Z" fill="#66bfe1"/><path d="M21 20h22" stroke="#fff" stroke-width="3" stroke-linecap="round"/>',
+    study: '<rect x="11" y="10" width="34" height="44" rx="5" fill="#f4a43b" stroke="#63391f" stroke-width="3.5"/><path d="M19 20h18M19 28h14M19 36h16" stroke="#fff7dd" stroke-width="3" stroke-linecap="round"/><path d="m45 43 8-23 5 2-8 23-6 7 1-9Z" fill="#ffc14d" stroke="#63391f" stroke-width="3" stroke-linejoin="round"/>',
+    walk: '<path d="M22 10c7 1 9 8 5 14s-13 3-14-4 3-11 9-10Zm20 26c8 1 11 9 6 15s-14 2-15-5 3-11 9-10Z" fill="#8db179" stroke="#63391f" stroke-width="3.5"/><circle cx="10" cy="12" r="3" fill="#ee8d2b"/><circle cx="51" cy="30" r="3" fill="#ee8d2b"/>',
+    medicine: '<path d="M18 47c-7-7-7-18 0-25l6-6c7-7 18-7 25 0s7 18 0 25l-6 6c-7 7-18 7-25 0Z" fill="#f29a91" stroke="#63391f" stroke-width="3.5"/><path d="m19 46 29-29" stroke="#fff7dd" stroke-width="5"/>',
+    nutrition: '<path d="M32 20c-9-8-21 0-19 14 3 19 14 22 19 16 5 6 16 3 19-16 2-14-10-22-19-14Z" fill="#ef7661" stroke="#63391f" stroke-width="3.5"/><path d="M32 20c0-7 5-11 11-11" stroke="#63391f" stroke-width="3.5" stroke-linecap="round"/><path d="M33 16c5-6 12-4 15 1-6 4-11 4-15-1Z" fill="#8eaa69" stroke="#63391f" stroke-width="3"/>',
+  };
+  const iconMarkup = (value) => {
+    const key = iconKey(value);
+    if (key.startsWith('letter-')) {
+      const letter = key.slice(7, 8);
+      const color = fallbackColors[letter.charCodeAt(0) % fallbackColors.length];
+      return `<span class="fallback-icon-art" style="--fallback-color:${color}">${letter}</span>`;
+    }
+    if (key.startsWith('color-')) {
+      const index = Number(key.slice(6)) || 0;
+      return `<span class="fallback-icon-art color-only" style="--fallback-color:${fallbackColors[index % fallbackColors.length]}"></span>`;
+    }
+    return `<img class="icon-art" src="./assets/icons/${key}.png?v=2" alt="">`;
+  };
+
+  const formatFrequency = (frequency) => {
+    if (frequency.type === 'weekly') return t().weeklyFrequency(frequency.count);
+    if (frequency.type === 'weekdays') return t().selectedFrequency(frequency.days.map((day) => t()[day]).join('、'));
+    if (frequency.type === 'interval') return t().intervalFrequency(frequency.days);
+    return t().dailyFrequency;
+  };
+
+  const formatValueWithUnit = (value, unit) => unit ? `${value} ${unit}` : String(value);
+
+  const habitDetail = (habit) => {
+    if (habit.kind === 'time') return t().planActual(habit.target, habit.actual || '—');
+    if (habit.kind === 'workout') {
+      const unit = state.language === 'zh' ? '分钟' : 'min';
+      return t().planActual(`${habit.minuteTarget} ${unit}`, `${habit.minutes} ${unit}`);
+    }
+    if (habit.kind === 'reading') {
+      const planned = state.language === 'zh' ? `${habit.target} 分钟` : `${habit.target} min`;
+      const actual = state.language === 'zh'
+        ? `${habit.minutes} 分钟 · ${habit.pages} 页`
+        : `${habit.minutes} min · ${habit.pages} pages`;
+      return t().planActual(planned, actual);
+    }
+    if (habit.kind === 'weight') {
+      const planned = state.language === 'zh' ? '每天记录' : 'daily log';
+      return t().planActual(planned, `${habit.value} kg`);
+    }
+    if (habit.kind === 'custom' && habit.quantified) {
+      return t().planActual(
+        formatValueWithUnit(habit.target, habit.unit),
+        formatValueWithUnit(habit.value || 0, habit.unit),
+      );
+    }
+    return t().planActual(formatFrequency(habit.frequency), habit.recorded ? '✓' : '—');
+  };
+
+  const habitRatioLabel = (habit) => {
+    if (habit.kind === 'reading') return `${habit.minutes} / ${habit.target}`;
+    if (habit.kind === 'custom' && habit.quantified && habit.frequency.type === 'daily') return `${habit.value || 0} / ${habit.target}`;
+    return `${habit.weekDone} / ${habit.weekTarget}`;
+  };
+
+  const statusSymbol = (habit) => habit.complete ? '✓' : habit.recorded ? '•' : '+';
+  const statusClass = (habit) => habit.complete ? 'is-complete' : habit.recorded ? 'is-recorded' : '';
+
+  const renderToday = () => {
+    const visibleHabits = state.habits.filter((habit) => !habit.hidden);
+    const recorded = visibleHabits.filter((habit) => habit.recorded).length;
+    document.getElementById('today-recorded-summary').textContent = t().recordedSummary(recorded, visibleHabits.length);
+    elements.habitList.innerHTML = visibleHabits.map((habit) => `
+      <article class="habit-card">
+        <span class="habit-icon" aria-hidden="true">${iconMarkup(habit.icon)}</span>
+        <div class="habit-identity">
+          <span class="habit-name">${habitName(habit)}</span>
+          <span class="habit-ratio">${habitRatioLabel(habit)}</span>
+        </div>
+        <div class="habit-copy">
+          <div class="progress-track"><div class="progress-fill" style="width:${Math.round(habit.kind === 'reading' ? habit.minutes / habit.target * 100 : ratio(habit) * 100)}%"></div></div>
+          <span class="habit-detail">${habitDetail(habit)}</span>
+        </div>
+        <button class="checkin-button ${statusClass(habit)}" type="button" data-checkin="${habit.id}" aria-label="${habitName(habit)}">${statusSymbol(habit)}</button>
+      </article>
+    `).join('');
+  };
+
+  const renderReview = () => {
+    const sleep = state.habits.find((habit) => habit.id === 'sleep');
+    const wake = state.habits.find((habit) => habit.id === 'wake');
+    document.getElementById('sleep-week-summary').textContent = sleep || wake
+      ? state.language === 'zh'
+        ? `入睡 ${sleep?.weekDone ?? 0}/7 · 起床 ${wake?.weekDone ?? 0}/7`
+        : `Bed ${sleep?.weekDone ?? 0}/7 · wake ${wake?.weekDone ?? 0}/7`
+      : t().noData;
+    const weight = state.habits.find((habit) => habit.id === 'weight');
+    document.getElementById('weight-summary').textContent = weight
+      ? state.language === 'zh' ? `${weight.value} kg · 7日 ${weight.change} kg` : `${weight.value} kg · 7 days ${weight.change} kg`
+      : t().noData;
+    document.getElementById('suggestion-title').textContent = t().suggestion;
+    renderPeriodHeader();
+    const columns = periodColumns();
+    elements.weekMatrix.innerHTML = `
+      <thead><tr><th>${t().habits}</th>${columns.map((column) => `<th>${column}</th>`).join('')}</tr></thead>
+      <tbody>${state.habits.map((habit) => `
+        <tr>
+          <td><span class="matrix-habit-icon">${iconMarkup(habit.icon)}</span>${habitName(habit)}</td>
+          ${columns.map((_, index) => {
+            const status = habit.weekStates[(index + Math.abs(reviewOffset)) % habit.weekStates.length];
+            return `<td><span class="matrix-mark ${status === 'complete' ? 'is-complete' : status === 'recorded' ? 'is-recorded' : ''}">${status === 'complete' ? '✓' : status === 'recorded' ? '•' : '○'}</span></td>`;
+          }).join('')}
+        </tr>
+      `).join('')}</tbody>
+    `;
+    renderWeightChart();
+    renderSleepChart();
+  };
+
+  const startOfWeek = (date) => {
+    const result = new Date(date);
+    const day = result.getDay() || 7;
+    result.setDate(result.getDate() - day + 1);
+    result.setHours(12, 0, 0, 0);
+    return result;
+  };
+
+  const formatShortDate = (date) => new Intl.DateTimeFormat(state.language === 'zh' ? 'zh-CN' : 'en-US', {
+    month: '2-digit', day: '2-digit',
+  }).format(date);
+
+  const renderPeriodHeader = () => {
+    document.querySelectorAll('.period-button').forEach((button) => {
+      const selected = button.dataset.period === reviewPeriod;
+      button.classList.toggle('is-selected', selected);
+      button.setAttribute('aria-pressed', String(selected));
+    });
+    const now = new Date();
+    let start;
+    let end;
+    if (reviewPeriod === 'week') {
+      start = startOfWeek(now);
+      start.setDate(start.getDate() + reviewOffset * 7);
+      end = new Date(start);
+      end.setDate(end.getDate() + 6);
+    } else if (reviewPeriod === 'month') {
+      start = new Date(now.getFullYear(), now.getMonth() + reviewOffset, 1, 12);
+      end = new Date(start.getFullYear(), start.getMonth() + 1, 0, 12);
+    } else if (reviewPeriod === 'quarter') {
+      const currentQuarterStart = Math.floor(now.getMonth() / 3) * 3;
+      start = new Date(now.getFullYear(), currentQuarterStart + reviewOffset * 3, 1, 12);
+      end = new Date(start.getFullYear(), start.getMonth() + 3, 0, 12);
+    } else {
+      start = new Date(now.getFullYear() + reviewOffset, 0, 1, 12);
+      end = new Date(start.getFullYear(), 11, 31, 12);
+    }
+    document.getElementById('period-caption').textContent = reviewOffset === 0
+      ? t().periodNames[reviewPeriod]
+      : `${reviewOffset > 0 ? '+' : ''}${reviewOffset}`;
+    document.getElementById('period-range').textContent = reviewPeriod === 'year'
+      ? String(start.getFullYear())
+      : `${formatShortDate(start)} → ${formatShortDate(end)}`;
+  };
+
+  const periodColumns = () => {
+    if (reviewPeriod === 'week') return t().dayNames;
+    if (reviewPeriod === 'month') return state.language === 'zh' ? ['第1周', '第2周', '第3周', '第4周', '第5周'] : ['W1', 'W2', 'W3', 'W4', 'W5'];
+    if (reviewPeriod === 'quarter') return state.language === 'zh' ? ['第1月', '第2月', '第3月'] : ['M1', 'M2', 'M3'];
+    return state.language === 'zh'
+      ? ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
+      : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  };
+
+  const timeToMinutes = (value) => {
+    const [hours, minutes] = String(value).split(':').map(Number);
+    return hours * 60 + minutes;
+  };
+
+  const renderSleepChart = () => {
+    const bedValues = [...bedtimeHistory];
+    const wakeValues = [...wakeHistory];
+    const sleep = state.habits.find((habit) => habit.id === 'sleep');
+    const wake = state.habits.find((habit) => habit.id === 'wake');
+    if (sleep?.actual) bedValues[6] = sleep.actual;
+    if (wake?.actual) wakeValues[6] = wake.actual;
+    const x = (index) => 34 + index * 48;
+    const bedY = (value) => 20 + (timeToMinutes(value) - (22 * 60 + 50)) / 70 * 45;
+    const wakeY = (value) => 93 + (timeToMinutes(value) - (6 * 60 + 35)) / 55 * 42;
+    const bedPlanY = bedY('23:30');
+    const wakePlanY = wakeY('07:00');
+    const bedPoints = bedValues.map((value, index) => `${x(index)},${bedY(value)}`).join(' ');
+    const wakePoints = wakeValues.map((value, index) => `${x(index)},${wakeY(value)}`).join(' ');
+    elements.sleepChart.setAttribute('aria-label', `${t().actualBedtime}, ${t().actualWake}`);
+    elements.sleepChart.innerHTML = `
+      <line class="chart-grid" x1="34" y1="20" x2="326" y2="20"></line>
+      <line class="chart-grid" x1="34" y1="70" x2="326" y2="70"></line>
+      <line class="chart-grid" x1="34" y1="92" x2="326" y2="92"></line>
+      <line class="chart-grid" x1="34" y1="137" x2="326" y2="137"></line>
+      <line class="chart-plan" x1="34" y1="${bedPlanY}" x2="326" y2="${bedPlanY}"></line>
+      <line class="chart-plan" x1="34" y1="${wakePlanY}" x2="326" y2="${wakePlanY}"></line>
+      <polyline class="chart-line" points="${bedPoints}"></polyline>
+      <polyline class="chart-line-wake" points="${wakePoints}"></polyline>
+      ${bedValues.map((value, index) => `<circle class="chart-point" cx="${x(index)}" cy="${bedY(value)}" r="4"></circle>`).join('')}
+      ${wakeValues.map((value, index) => `<circle class="chart-point-wake" cx="${x(index)}" cy="${wakeY(value)}" r="4"></circle>`).join('')}
+      ${t().dayNames.map((day, index) => `<text class="chart-label" x="${x(index)}" y="157" text-anchor="middle">${day.replace(/^周/, '')}</text>`).join('')}
+    `;
+  };
+
+  const renderWeightChart = () => {
+    const values = [...weightHistory];
+    const weight = state.habits.find((habit) => habit.id === 'weight');
+    if (typeof weight?.value === 'number') values[6] = weight.value;
+    const min = Math.min(...values) - 0.15;
+    const max = Math.max(...values) + 0.15;
+    const x = (index) => 34 + index * 48;
+    const y = (value) => 20 + (max - value) / Math.max(0.1, max - min) * 108;
+    elements.weightChart.setAttribute('aria-label', t().weightTrend);
+    elements.weightChart.innerHTML = `
+      <line class="chart-grid" x1="34" y1="22" x2="326" y2="22"></line>
+      <line class="chart-grid" x1="34" y1="76" x2="326" y2="76"></line>
+      <line class="chart-grid" x1="34" y1="130" x2="326" y2="130"></line>
+      <polyline class="chart-line" points="${values.map((value, index) => `${x(index)},${y(value)}`).join(' ')}"></polyline>
+      ${values.map((value, index) => `<circle class="chart-point" cx="${x(index)}" cy="${y(value)}" r="4"></circle>`).join('')}
+      ${t().dayNames.map((day, index) => `<text class="chart-label" x="${x(index)}" y="157" text-anchor="middle">${day.replace(/^周/, '')}</text>`).join('')}
+    `;
+  };
+
+  const renderManagedHabits = () => {
+    elements.managedHabitList.innerHTML = state.habits.map((habit) => `
+      <article class="managed-habit ${habit.hidden ? 'is-hidden-habit' : ''}" data-managed-habit="${habit.id}" draggable="true">
+        <button class="drag-handle" type="button" aria-label="${t().dragHint}" data-drag-handle="${habit.id}">≡</button>
+        <span class="habit-icon">${iconMarkup(habit.icon)}</span>
+        <div>
+          <span class="managed-habit-name">${habitName(habit)}</span>
+          <span class="managed-habit-meta">${habit.hidden ? (state.language === 'zh' ? '已从今天隐藏 · ' : 'Hidden from Today · ') : ''}${formatFrequency(habit.frequency)} · ${habit.kind === 'custom' ? (habit.quantified ? t().quantified(t().metricLabels[habit.metricType]) : t().simpleCheckin) : t().trackingLabels[habit.id]}</span>
+        </div>
+        <div class="habit-actions">
+          <button class="edit-habit-button" type="button" data-habit-menu="${habit.id}" aria-label="习惯操作">•••</button>
+          <div class="habit-action-menu" data-menu-for="${habit.id}" hidden>
+            <button type="button" data-edit-habit="${habit.id}">编辑</button>
+            <button type="button" data-toggle-hidden="${habit.id}">${habit.hidden ? '取消隐藏' : '隐藏'}</button>
+            <button class="danger-action" type="button" data-delete-habit="${habit.id}">删除</button>
+          </div>
+        </div>
+      </article>
+    `).join('');
+  };
+
+  const renderCopy = () => {
+    document.documentElement.lang = state.language === 'zh' ? 'zh-CN' : 'en';
+    document.querySelectorAll('[data-i18n]').forEach((element) => {
+      const value = t()[element.dataset.i18n];
+      if (typeof value === 'string') element.textContent = value;
+    });
+    const hour = new Date().getHours();
+    const greetingKey = hour >= 5 && hour < 12
+      ? 'morningGreeting'
+      : hour >= 12 && hour < 18
+        ? 'afternoonGreeting'
+        : 'eveningGreeting';
+    document.getElementById('today-title').textContent = state.language === 'zh'
+      ? `${t()[greetingKey]}，Donna ☀️`
+      : `${t()[greetingKey]}, Donna ☀️`;
+    document.getElementById('language-button').textContent = state.language === 'zh' ? 'EN' : '中';
+    document.getElementById('habit-name').placeholder = state.language === 'zh' ? '例如：冥想' : 'e.g. Meditation';
+    document.querySelectorAll('.icon-choice[data-icon]').forEach((button) => {
+      button.innerHTML = iconMarkup(button.dataset.icon);
+    });
+    renderFallbackIcons();
+    renderWeekdayChoices();
+  };
+
+  const renderDate = () => {
+    const options = state.language === 'zh'
+      ? { month: 'long', day: 'numeric', weekday: 'long' }
+      : { month: 'long', day: 'numeric', weekday: 'long' };
+    document.getElementById('today-date').textContent = new Intl.DateTimeFormat(state.language === 'zh' ? 'zh-CN' : 'en-US', options).format(new Date());
+    const quotes = state.language === 'zh'
+      ? ['慢慢来，你正在成为自己喜欢的样子。', '每一次真实记录，都是在认真照顾自己。', '今天不必完美，只需要继续。']
+      : ['Take your time. You are becoming someone you like.', 'Every honest record is a way of caring for yourself.', 'Today does not need to be perfect. Just keep going.'];
+    document.getElementById('daily-quote').textContent = quotes[new Date().getDate() % quotes.length];
+  };
+
+  const renderAll = () => {
+    renderCopy();
+    renderDate();
+    renderToday();
+    renderReview();
+    renderManagedHabits();
+  };
+
+  const openLayer = (layer) => {
+    elements.scrim.hidden = false;
+    layer.hidden = false;
+    document.body.style.overflow = 'hidden';
+  };
+
+  const closeLayers = () => {
+    elements.scrim.hidden = true;
+    elements.sheet.hidden = true;
+    elements.habitSheet.hidden = true;
+    document.body.style.overflow = '';
+    activeHabitId = null;
+  };
+
+  const field = (label, input) => `<div class="field"><label>${label}</label>${input}</div>`;
+
+  const hasOptionalContent = (habit) => Object.values(habit.recordOptions || {}).some(Boolean);
+
+  const optionalCheckinFields = (habit) => {
+    const options = habit.recordOptions || {};
+    if (!Object.values(options).some(Boolean)) return '';
+    return `
+      <div class="field">
+        <label for="record-note">${t().textNote}</label>
+        <div class="note-composer">
+          <textarea class="note-textarea" id="record-note" placeholder="${t().notePlaceholder}">${habit.note || ''}</textarea>
+          <div class="note-actions">
+            <label class="attachment-button" for="record-photo">▧ ${t().photo}</label>
+            <input id="record-photo" type="file" accept="image/*" hidden>
+            <button class="voice-prototype-button" id="voice-prototype-button" type="button">◉ ${t().voice}</button>
+          </div>
+          <img class="attachment-preview" id="attachment-preview" alt="" hidden>
+        </div>
+      </div>
+    `;
+  };
+
+  const setupOptionalInputs = () => {
+    const photoInput = document.getElementById('record-photo');
+    if (photoInput) {
+      photoInput.addEventListener('change', () => {
+        const file = photoInput.files?.[0];
+        if (!file) return;
+        const preview = document.getElementById('attachment-preview');
+        preview.src = URL.createObjectURL(file);
+        preview.hidden = false;
+      });
+    }
+    const voiceButton = document.getElementById('voice-prototype-button');
+    if (voiceButton) {
+      voiceButton.addEventListener('click', () => {
+        voiceButton.textContent = t().voiceAdded;
+        const note = document.getElementById('record-note');
+        if (note) note.value = `${note.value}${note.value ? '\n' : ''}[${t().voiceAdded}]`;
+      });
+    }
+  };
+
+  const openCheckin = (habitId) => {
+    const habit = state.habits.find((item) => item.id === habitId);
+    activeHabitId = habitId;
+    document.getElementById('sheet-title').textContent = habitName(habit);
+    elements.result.textContent = '';
+
+    if (habit.kind === 'boolean' && !hasOptionalContent(habit)) {
+      habit.recorded = !habit.recorded;
+      habit.complete = habit.recorded;
+      habit.weekDone += habit.recorded ? 1 : -1;
+      habit.weekStates[6] = habit.recorded ? 'complete' : 'none';
+      persist();
+      renderAll();
+      showToast(habit.recorded ? t().completedToday : t().tapToComplete);
+      return;
+    }
+
+    if (habit.kind === 'time') {
+      elements.fields.innerHTML = `
+        ${field(t().timeLabel, `<input id="checkin-time" type="time" value="${habit.actual || habit.target}" required>`)}
+        <p class="plan-note">${t().plannedTime(habit.target)}</p>
+        ${habit.id === 'sleep' ? field(t().quality, `<select id="sleep-quality">${t().qualityOptions.map((option) => `<option>${option}</option>`).join('')}</select>`) : ''}
+        ${optionalCheckinFields(habit)}
+      `;
+    } else if (habit.kind === 'workout') {
+      elements.fields.innerHTML = `
+        <div class="field-pair">
+          ${field(t().minutes, `<input id="workout-minutes" type="number" min="1" value="45" required>`)}
+          ${field(t().activity, `<select id="activity-type">${t().activityOptions.map((option) => `<option>${option}</option>`).join('')}</select>`)}
+        </div>
+        ${optionalCheckinFields(habit)}
+      `;
+    } else if (habit.kind === 'reading') {
+      elements.fields.innerHTML = `
+        <div class="field-pair">
+          ${field(t().minutes, `<input id="reading-minutes" type="number" min="0" value="${habit.minutes}" required>`)}
+          ${field(t().pages, `<input id="reading-pages" type="number" min="0" value="${habit.pages}" required>`)}
+        </div>
+        ${optionalCheckinFields(habit)}
+      `;
+    } else if (habit.kind === 'weight') {
+      elements.fields.innerHTML = `${field(t().weight, `<input id="weight-value" type="number" min="1" step="0.1" value="${habit.value}" required>`)}${optionalCheckinFields(habit)}`;
+    } else if (habit.kind === 'boolean') {
+      elements.fields.innerHTML = optionalCheckinFields(habit);
+    } else if (habit.kind === 'custom') {
+      if (!habit.quantified && !hasOptionalContent(habit)) {
+        habit.recorded = !habit.recorded;
+        habit.complete = habit.recorded;
+        habit.weekDone += habit.recorded ? 1 : -1;
+        habit.weekStates[6] = habit.recorded ? 'complete' : 'none';
+        persist();
+        renderAll();
+        showToast(habit.recorded ? t().completedToday : t().tapToComplete);
+        return;
+      }
+      if (habit.quantified) {
+        const type = habit.metricType === 'time' ? 'time' : 'number';
+        const unitLabel = habit.unit
+          ? `<span class="value-input-unit">${habit.unit}</span>`
+          : '';
+        elements.fields.innerHTML = `${field(t().enterValue, `
+          <div class="value-input-row">
+            <input id="custom-value" type="${type}" min="0" inputmode="${type === 'number' ? 'decimal' : 'text'}" value="${habit.value || ''}" required>
+            ${unitLabel}
+          </div>
+        `)}${optionalCheckinFields(habit)}`;
+      } else {
+        elements.fields.innerHTML = optionalCheckinFields(habit);
+      }
+    }
+    openLayer(elements.sheet);
+    setupOptionalInputs();
+  };
+
+  const saveCheckin = () => {
+    const habit = state.habits.find((item) => item.id === activeHabitId);
+    const wasComplete = habit.complete;
+
+    if (habit.kind === 'time') {
+      habit.actual = document.getElementById('checkin-time').value;
+      habit.recorded = true;
+      habit.complete = habit.id === 'sleep' ? habit.actual <= habit.target : habit.actual <= habit.target;
+    } else if (habit.kind === 'workout') {
+      const minutes = Number(document.getElementById('workout-minutes').value);
+      habit.minutes += minutes;
+      habit.actual += habit.recorded ? 0 : 1;
+      habit.recorded = true;
+      habit.complete = minutes >= 30;
+    } else if (habit.kind === 'reading') {
+      habit.minutes = Number(document.getElementById('reading-minutes').value);
+      habit.pages = Number(document.getElementById('reading-pages').value);
+      habit.recorded = true;
+      habit.complete = habit.minutes >= habit.target;
+    } else if (habit.kind === 'weight') {
+      habit.value = Number(document.getElementById('weight-value').value);
+      habit.recorded = true;
+      habit.complete = true;
+    } else if (habit.kind === 'boolean') {
+      habit.recorded = true;
+      habit.complete = true;
+    } else if (habit.kind === 'custom') {
+      if (habit.quantified) {
+        const raw = document.getElementById('custom-value').value;
+        habit.value = habit.metricType === 'time' ? raw : Number(raw);
+        habit.complete = habit.metricType === 'time' ? true : habit.value >= habit.target;
+      } else {
+        habit.complete = true;
+      }
+      habit.recorded = true;
+    }
+    const note = document.getElementById('record-note');
+    if (note) habit.note = note.value.trim();
+
+    if (!wasComplete && habit.complete) habit.weekDone = Math.min(habit.weekTarget, habit.weekDone + 1);
+    if (wasComplete && !habit.complete) habit.weekDone = Math.max(0, habit.weekDone - 1);
+    habit.weekStates[6] = habit.complete ? 'complete' : habit.recorded ? 'recorded' : 'none';
+    persist();
+    closeLayers();
+    renderAll();
+    showToast(t().saved);
+  };
+
+  const showToast = (message) => {
+    elements.toast.textContent = message;
+    elements.toast.classList.add('is-visible');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => elements.toast.classList.remove('is-visible'), 1800);
+  };
+
+  const reorderHabits = (sourceId, targetId) => {
+    if (!sourceId || !targetId || sourceId === targetId) return;
+    const sourceIndex = state.habits.findIndex((habit) => habit.id === sourceId);
+    const targetIndex = state.habits.findIndex((habit) => habit.id === targetId);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+    const [moved] = state.habits.splice(sourceIndex, 1);
+    const adjustedTarget = sourceIndex < targetIndex ? targetIndex - 1 : targetIndex;
+    state.habits.splice(adjustedTarget, 0, moved);
+    persist();
+    renderAll();
+    showToast(state.language === 'zh' ? '顺序已更新' : 'Order updated');
+  };
+
+  const clearDragStyles = () => {
+    elements.managedHabitList.querySelectorAll('.managed-habit').forEach((card) => {
+      card.classList.remove('is-dragging', 'is-drag-over');
+    });
+  };
+
+  const renderWeekdayChoices = () => {
+    const selected = new Set([...document.querySelectorAll('.weekday-choice.is-selected')].map((button) => button.dataset.day));
+    document.getElementById('weekday-options').innerHTML = weekdayKeys.map((day, index) => `
+      <button class="weekday-choice ${selected.has(day) || (!selected.size && index < 5) ? 'is-selected' : ''}" type="button" data-day="${day}" aria-pressed="${selected.has(day) || (!selected.size && index < 5)}">${t()[day]}</button>
+    `).join('');
+  };
+
+  const renderFallbackIcons = () => {
+    document.getElementById('letter-icon-options').innerHTML = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map((letter) => `
+      <button class="icon-choice fallback-choice" type="button" data-icon="letter-${letter}" aria-label="字母 ${letter}" aria-pressed="false">${iconMarkup(`letter-${letter}`)}</button>
+    `).join('');
+    document.getElementById('color-icon-options').innerHTML = fallbackColors.map((_, index) => `
+      <button class="icon-choice fallback-choice" type="button" data-icon="color-${index}" aria-label="颜色 ${index + 1}" aria-pressed="false">${iconMarkup(`color-${index}`)}</button>
+    `).join('');
+  };
+
+  const setFrequency = (frequency) => {
+    selectedFrequency = frequency;
+    document.querySelectorAll('.frequency-choice').forEach((button) => {
+      const selected = button.dataset.frequency === frequency;
+      button.classList.toggle('is-selected', selected);
+      button.setAttribute('aria-pressed', String(selected));
+    });
+    document.getElementById('weekdays-detail').hidden = frequency !== 'weekdays';
+    document.getElementById('weekly-detail').hidden = frequency !== 'weekly';
+    document.getElementById('interval-detail').hidden = frequency !== 'interval';
+  };
+
+  const resetHabitForm = () => {
+    document.getElementById('habit-form').reset();
+    selectedIcon = 'sprout';
+    document.querySelectorAll('.icon-choice').forEach((button) => {
+      const selected = button.dataset.icon === selectedIcon;
+      button.classList.toggle('is-selected', selected);
+      button.setAttribute('aria-pressed', String(selected));
+    });
+    document.getElementById('quantify-fields').hidden = true;
+    document.getElementById('editing-habit-id').value = '';
+    document.getElementById('habit-sheet-title').textContent = t().whatToKeep;
+    document.getElementById('save-habit-button').textContent = t().createHabit;
+    document.getElementById('fallback-icon-panel').hidden = true;
+    document.getElementById('icon-more-button').setAttribute('aria-expanded', 'false');
+    setFrequency('daily');
+  };
+
+  const metricSettingsForHabit = (habit) => {
+    if (habit.kind === 'time') return { metricType: 'time', target: habit.target, unit: '' };
+    if (habit.kind === 'workout') return { metricType: 'duration', target: habit.minuteTarget, unit: '分钟' };
+    if (habit.kind === 'reading') return { metricType: 'duration', target: habit.target, unit: '分钟' };
+    if (habit.kind === 'weight') return { metricType: 'number', target: 1, unit: '' };
+    return { metricType: habit.metricType || 'duration', target: habit.target || 30, unit: habit.unit || '' };
+  };
+
+  const configureMetricInput = (metricType) => {
+    const targetInput = document.getElementById('habit-target');
+    targetInput.type = metricType === 'time' ? 'time' : 'number';
+    targetInput.min = metricType === 'time' ? '' : '1';
+    if (metricType === 'time' && !String(targetInput.value).includes(':')) targetInput.value = '23:30';
+  };
+
+  const openHabitEditor = (habitId) => {
+    const habit = state.habits.find((item) => item.id === habitId);
+    if (!habit) return;
+    resetHabitForm();
+    document.getElementById('editing-habit-id').value = habit.id;
+    document.getElementById('habit-sheet-title').textContent = t().editHabit;
+    document.getElementById('save-habit-button').textContent = t().saveChanges;
+    document.getElementById('habit-name').value = habitName(habit);
+    selectedIcon = iconKey(habit.icon);
+    document.querySelectorAll('.icon-choice[data-icon]').forEach((button) => {
+      const selected = button.dataset.icon === selectedIcon;
+      button.classList.toggle('is-selected', selected);
+      button.setAttribute('aria-pressed', String(selected));
+    });
+    const quantified = habit.kind !== 'boolean' || Boolean(habit.quantified);
+    document.getElementById('quantify-toggle').checked = quantified;
+    document.getElementById('quantify-fields').hidden = !quantified;
+    const metric = metricSettingsForHabit(habit);
+    document.getElementById('metric-type').value = metric.metricType;
+    configureMetricInput(metric.metricType);
+    document.getElementById('habit-target').value = metric.target;
+    document.getElementById('habit-unit').value = ['分钟', '次', ''].includes(metric.unit) ? metric.unit : '';
+    document.getElementById('notes-toggle').checked = hasOptionalContent(habit);
+    setFrequency(habit.frequency.type);
+    if (habit.frequency.type === 'weekly') document.getElementById('weekly-count').value = habit.frequency.count;
+    if (habit.frequency.type === 'interval') document.getElementById('interval-days').value = habit.frequency.days;
+    if (habit.frequency.type === 'weekdays') {
+      const days = new Set(habit.frequency.days);
+      document.querySelectorAll('.weekday-choice').forEach((button) => {
+        const selected = days.has(button.dataset.day);
+        button.classList.toggle('is-selected', selected);
+        button.setAttribute('aria-pressed', String(selected));
+      });
+    }
+    openLayer(elements.habitSheet);
+  };
+
+  const saveHabit = () => {
+    const name = document.getElementById('habit-name').value.trim();
+    const quantified = document.getElementById('quantify-toggle').checked;
+    const metricType = document.getElementById('metric-type').value;
+    const targetRaw = document.getElementById('habit-target').value;
+    const target = metricType === 'time' ? targetRaw : Number(targetRaw) || 1;
+    const unit = document.getElementById('habit-unit').value.trim();
+    let frequency = { type: 'daily' };
+    let weekTarget = 7;
+    if (selectedFrequency === 'weekly') {
+      const count = Number(document.getElementById('weekly-count').value) || 1;
+      frequency = { type: 'weekly', count };
+      weekTarget = count;
+    } else if (selectedFrequency === 'weekdays') {
+      const days = [...document.querySelectorAll('.weekday-choice.is-selected')].map((button) => button.dataset.day);
+      frequency = { type: 'weekdays', days };
+      weekTarget = days.length;
+    } else if (selectedFrequency === 'interval') {
+      const days = Number(document.getElementById('interval-days').value) || 2;
+      frequency = { type: 'interval', days };
+      weekTarget = Math.max(1, Math.round(7 / days));
+    }
+    const notesEnabled = document.getElementById('notes-toggle').checked;
+    const recordOptions = { text: notesEnabled, photo: notesEnabled, voice: notesEnabled };
+    const editingId = document.getElementById('editing-habit-id').value;
+    const existing = state.habits.find((habit) => habit.id === editingId);
+    if (existing) {
+      existing.name = name;
+      existing.icon = selectedIcon;
+      existing.frequency = frequency;
+      existing.weekTarget = weekTarget;
+      existing.recordOptions = recordOptions;
+      if (existing.kind === 'time' && metricType === 'time') existing.target = target;
+      else if (existing.kind === 'workout' && metricType === 'duration') existing.minuteTarget = Number(target);
+      else if (existing.kind === 'reading' && metricType === 'duration') existing.target = Number(target);
+      else if (existing.kind === 'custom') Object.assign(existing, { quantified, metricType, target, unit });
+      showToast(t().habitUpdated);
+    } else {
+      state.habits.push({
+        id: `custom-${Date.now()}`, name, icon: selectedIcon, kind: 'custom', quantified, metricType, target, unit,
+        value: 0, recorded: false, complete: false, weekDone: 0, weekTarget, frequency, recordOptions,
+        weekStates: ['none', 'none', 'none', 'none', 'none', 'none', 'none'],
+      });
+      showToast(t().habitCreated);
+    }
+    persist();
+    closeLayers();
+    renderAll();
+  };
+
+  document.querySelectorAll('.nav-button').forEach((button) => {
+    button.addEventListener('click', () => {
+      document.querySelectorAll('.nav-button').forEach((item) => item.classList.toggle('is-active', item === button));
+      document.querySelectorAll('.page').forEach((page) => page.classList.toggle('is-active', page.id === button.dataset.page));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  });
+
+  elements.habitList.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-checkin]');
+    if (button) openCheckin(button.dataset.checkin);
+  });
+
+  document.getElementById('checkin-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    saveCheckin();
+  });
+  document.getElementById('close-sheet').addEventListener('click', closeLayers);
+  document.getElementById('close-habit-sheet').addEventListener('click', closeLayers);
+  elements.scrim.addEventListener('click', closeLayers);
+
+  document.getElementById('language-button').addEventListener('click', () => {
+    state.language = state.language === 'zh' ? 'en' : 'zh';
+    persist();
+    renderAll();
+  });
+
+  document.getElementById('add-habit-button').addEventListener('click', () => {
+    resetHabitForm();
+    openLayer(elements.habitSheet);
+  });
+
+  document.getElementById('quantify-toggle').addEventListener('change', (event) => {
+    document.getElementById('quantify-fields').hidden = !event.target.checked;
+  });
+
+  document.getElementById('icon-options').addEventListener('click', (event) => {
+    const button = event.target.closest('[data-icon]');
+    if (!button) return;
+    selectedIcon = button.dataset.icon;
+    document.querySelectorAll('.icon-choice').forEach((choice) => {
+      const selected = choice === button;
+      choice.classList.toggle('is-selected', selected);
+      choice.setAttribute('aria-pressed', String(selected));
+    });
+  });
+
+  document.getElementById('fallback-icon-panel').addEventListener('click', (event) => {
+    const button = event.target.closest('[data-icon]');
+    if (!button) return;
+    selectedIcon = button.dataset.icon;
+    document.querySelectorAll('.icon-choice[data-icon]').forEach((choice) => {
+      const selected = choice.dataset.icon === selectedIcon;
+      choice.classList.toggle('is-selected', selected);
+      choice.setAttribute('aria-pressed', String(selected));
+    });
+  });
+
+  document.getElementById('icon-more-button').addEventListener('click', () => {
+    const panel = document.getElementById('fallback-icon-panel');
+    panel.hidden = !panel.hidden;
+    document.getElementById('icon-more-button').setAttribute('aria-expanded', String(!panel.hidden));
+  });
+
+  document.getElementById('frequency-options').addEventListener('click', (event) => {
+    const button = event.target.closest('[data-frequency]');
+    if (button) setFrequency(button.dataset.frequency);
+  });
+
+  document.getElementById('weekday-options').addEventListener('click', (event) => {
+    const button = event.target.closest('[data-day]');
+    if (!button) return;
+    button.classList.toggle('is-selected');
+    button.setAttribute('aria-pressed', String(button.classList.contains('is-selected')));
+  });
+
+  document.getElementById('habit-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    saveHabit();
+  });
+
+  document.getElementById('metric-type').addEventListener('change', (event) => {
+    configureMetricInput(event.target.value);
+  });
+
+  elements.managedHabitList.addEventListener('click', (event) => {
+    const menuButton = event.target.closest('[data-habit-menu]');
+    if (menuButton) {
+      pendingDeleteHabitId = null;
+      const menu = elements.managedHabitList.querySelector(`[data-menu-for="${menuButton.dataset.habitMenu}"]`);
+      elements.managedHabitList.querySelectorAll('.habit-action-menu').forEach((item) => {
+        if (item !== menu) item.hidden = true;
+      });
+      menu.hidden = !menu.hidden;
+      return;
+    }
+    const editButton = event.target.closest('[data-edit-habit]');
+    if (editButton) {
+      openHabitEditor(editButton.dataset.editHabit);
+      return;
+    }
+    const hideButton = event.target.closest('[data-toggle-hidden]');
+    if (hideButton) {
+      const habit = state.habits.find((item) => item.id === hideButton.dataset.toggleHidden);
+      if (!habit) return;
+      habit.hidden = !habit.hidden;
+      persist();
+      renderAll();
+      showToast(habit.hidden ? '已从今天隐藏' : '已恢复到今天');
+      return;
+    }
+    const deleteButton = event.target.closest('[data-delete-habit]');
+    if (deleteButton) {
+      const habit = state.habits.find((item) => item.id === deleteButton.dataset.deleteHabit);
+      if (!habit) return;
+      if (pendingDeleteHabitId !== habit.id) {
+        pendingDeleteHabitId = habit.id;
+        deleteButton.textContent = state.language === 'zh' ? '再次点击确认删除' : 'Click again to delete';
+        deleteButton.classList.add('is-confirming');
+        return;
+      }
+      pendingDeleteHabitId = null;
+      state.habits = state.habits.filter((item) => item.id !== habit.id);
+      persist();
+      renderAll();
+      showToast('习惯已删除');
+    }
+  });
+
+  elements.managedHabitList.addEventListener('dragstart', (event) => {
+    const card = event.target.closest('[data-managed-habit]');
+    if (!card) return;
+    draggedHabitId = card.dataset.managedHabit;
+    card.classList.add('is-dragging');
+    event.dataTransfer.effectAllowed = 'move';
+  });
+
+  elements.managedHabitList.addEventListener('dragover', (event) => {
+    const card = event.target.closest('[data-managed-habit]');
+    if (!card || card.dataset.managedHabit === draggedHabitId) return;
+    event.preventDefault();
+    elements.managedHabitList.querySelectorAll('.is-drag-over').forEach((item) => item.classList.remove('is-drag-over'));
+    card.classList.add('is-drag-over');
+  });
+
+  elements.managedHabitList.addEventListener('drop', (event) => {
+    event.preventDefault();
+    const card = event.target.closest('[data-managed-habit]');
+    const targetId = card?.dataset.managedHabit;
+    const sourceId = draggedHabitId;
+    draggedHabitId = null;
+    clearDragStyles();
+    reorderHabits(sourceId, targetId);
+  });
+
+  elements.managedHabitList.addEventListener('dragend', () => {
+    draggedHabitId = null;
+    clearDragStyles();
+  });
+
+  let pointerTargetId = null;
+  elements.managedHabitList.addEventListener('pointerdown', (event) => {
+    const handle = event.target.closest('[data-drag-handle]');
+    if (!handle) return;
+    draggedHabitId = handle.dataset.dragHandle;
+    pointerTargetId = draggedHabitId;
+    handle.setPointerCapture(event.pointerId);
+    handle.closest('.managed-habit')?.classList.add('is-dragging');
+  });
+
+  elements.managedHabitList.addEventListener('pointermove', (event) => {
+    if (!draggedHabitId) return;
+    event.preventDefault();
+    const card = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-managed-habit]');
+    if (!card || card.dataset.managedHabit === draggedHabitId) return;
+    pointerTargetId = card.dataset.managedHabit;
+    elements.managedHabitList.querySelectorAll('.is-drag-over').forEach((item) => item.classList.remove('is-drag-over'));
+    card.classList.add('is-drag-over');
+  });
+
+  elements.managedHabitList.addEventListener('pointerup', (event) => {
+    if (!draggedHabitId) return;
+    const sourceId = draggedHabitId;
+    const targetId = pointerTargetId;
+    draggedHabitId = null;
+    pointerTargetId = null;
+    clearDragStyles();
+    reorderHabits(sourceId, targetId);
+  });
+
+  document.getElementById('period-tabs').addEventListener('click', (event) => {
+    const button = event.target.closest('[data-period]');
+    if (!button) return;
+    reviewPeriod = button.dataset.period;
+    reviewOffset = 0;
+    renderReview();
+  });
+
+  document.getElementById('previous-period').addEventListener('click', () => {
+    reviewOffset -= 1;
+    renderReview();
+  });
+
+  document.getElementById('next-period').addEventListener('click', () => {
+    reviewOffset += 1;
+    renderReview();
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeLayers();
+  });
+
+  renderAll();
+
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => {
+        // Offline caching is optional; Bloom remains usable online.
+      });
+    });
+  }
+})();

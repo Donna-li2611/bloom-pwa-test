@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#fff9ed">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Bloom">
+  <meta name="description" content="Bloom — 温暖、直观的每日习惯记录与统计工具。">
+  <title>Bloom v0.2 产品原型</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./assets/pwa/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="./assets/pwa/bloom-icon-192.png">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <span class="prototype-badge" data-i18n="prototype">模拟数据原型</span>
+      <button class="language-button" id="language-button" type="button" aria-label="切换语言">EN</button>
+    </header>
+
+    <section class="page is-active" id="today-page" aria-labelledby="today-title">
+      <header class="hero">
+        <p class="date-label" id="today-date"></p>
+        <h1 id="today-title">早上好，Donna ☀️</h1>
+        <p class="daily-quote" id="daily-quote"></p>
+      </header>
+
+      <section class="habit-section" aria-labelledby="habit-heading">
+        <div class="section-heading">
+          <h2 id="habit-heading" data-i18n="today">今天</h2>
+          <span class="section-meta" id="today-recorded-summary"></span>
+        </div>
+        <div class="habit-list" id="habit-list"></div>
+      </section>
+    </section>
+
+    <section class="page" id="review-page" aria-label="统计">
+      <section class="period-panel" aria-label="复盘周期">
+        <div class="period-tabs" id="period-tabs">
+          <button class="period-button is-selected" type="button" data-period="week" aria-pressed="true" data-i18n="week">周</button>
+          <button class="period-button" type="button" data-period="month" aria-pressed="false" data-i18n="month">月</button>
+          <button class="period-button" type="button" data-period="quarter" aria-pressed="false" data-i18n="quarter">季</button>
+          <button class="period-button" type="button" data-period="year" aria-pressed="false" data-i18n="year">年</button>
+        </div>
+        <div class="period-navigation">
+          <button class="period-arrow" id="previous-period" type="button" aria-label="上一周期">‹</button>
+          <div>
+            <span class="period-caption" id="period-caption"></span>
+            <strong class="period-range" id="period-range"></strong>
+          </div>
+          <button class="period-arrow" id="next-period" type="button" aria-label="下一周期">›</button>
+        </div>
+      </section>
+
+      <section class="review-section" aria-labelledby="sleep-chart-title">
+        <div class="section-heading">
+          <h2 id="sleep-chart-title" data-i18n="sleepSchedule">起床与入睡时间</h2>
+          <span class="section-meta" id="sleep-week-summary"></span>
+        </div>
+        <div class="chart-card">
+          <svg class="sleep-chart" id="sleep-chart" viewBox="0 0 360 176" role="img"></svg>
+          <div class="chart-legend">
+            <span><i class="legend-solid"></i><span data-i18n="actualBedtime">实际入睡</span></span>
+            <span><i class="legend-wake"></i><span data-i18n="actualWake">实际起床</span></span>
+            <span><i class="legend-dashed"></i><span data-i18n="plannedBedtime">计划 23:30</span></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="review-section" aria-labelledby="weight-chart-title">
+        <div class="section-heading">
+          <h2 id="weight-chart-title" data-i18n="weightTrend">体重趋势</h2>
+          <span class="section-meta" id="weight-summary"></span>
+        </div>
+        <div class="chart-card">
+          <svg class="sleep-chart" id="weight-chart" viewBox="0 0 360 176" role="img"></svg>
+          <div class="future-data-note">
+            <span data-i18n="futureHealthData">未来可通过 IoT 加入体脂率、BMI 等身体数据</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="review-section" aria-labelledby="week-matrix-title">
+        <div class="section-heading">
+          <h2 id="week-matrix-title" data-i18n="checkinCalendar">打卡记录</h2>
+          <span class="section-meta" data-i18n="recordAndPlan">记录与计划分开显示</span>
+        </div>
+        <div class="matrix-scroll">
+          <table class="week-matrix" id="week-matrix"></table>
+        </div>
+      </section>
+
+      <section class="review-section suggestion-card" aria-labelledby="suggestion-title">
+        <p class="suggestion-label" data-i18n="nextWeek">下周可以试试</p>
+        <h2 id="suggestion-title" class="suggestion-text"></h2>
+      </section>
+    </section>
+
+    <section class="page" id="habits-page" aria-labelledby="habits-title">
+      <header class="habits-hero">
+        <p class="date-label" data-i18n="manageHabits">管理习惯</p>
+        <div class="habits-title-row">
+          <h1 id="habits-title" data-i18n="myHabits">我的习惯</h1>
+          <button class="add-habit-button" id="add-habit-button" type="button" aria-label="新增习惯">＋</button>
+        </div>
+        <p class="review-summary" data-i18n="manageHabitsHint">用简单的名称表达习惯，把频率和记录方式交给 Bloom。</p>
+      </header>
+      <div class="managed-habit-list" id="managed-habit-list"></div>
+    </section>
+
+    <nav class="bottom-nav" aria-label="主要导航">
+      <button class="nav-button is-active" type="button" data-page="today-page">
+        <span class="nav-icon" aria-hidden="true">☀︎</span>
+        <span data-i18n="today">今天</span>
+      </button>
+      <button class="nav-button" type="button" data-page="review-page">
+        <span class="nav-icon" aria-hidden="true">◔</span>
+        <span data-i18n="statistics">统计</span>
+      </button>
+      <button class="nav-button" type="button" data-page="habits-page">
+        <span class="nav-icon" aria-hidden="true">✦</span>
+        <span data-i18n="habits">习惯</span>
+      </button>
+    </nav>
+  </main>
+
+  <div class="scrim" id="scrim" hidden></div>
+  <section class="checkin-sheet" id="checkin-sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" hidden>
+    <div class="sheet-handle" aria-hidden="true"></div>
+    <header class="sheet-header">
+      <div>
+        <p class="sheet-eyebrow" data-i18n="record">记录</p>
+        <h2 id="sheet-title"></h2>
+      </div>
+      <button class="close-button" id="close-sheet" type="button" aria-label="关闭">×</button>
+    </header>
+    <form id="checkin-form">
+      <div id="checkin-fields"></div>
+      <p class="checkin-result" id="checkin-result" aria-live="polite"></p>
+      <button class="save-button" type="submit" data-i18n="saveRecord">保存记录</button>
+    </form>
+  </section>
+
+  <section class="habit-sheet" id="habit-sheet" role="dialog" aria-modal="true" aria-labelledby="habit-sheet-title" hidden>
+    <div class="sheet-handle" aria-hidden="true"></div>
+    <header class="sheet-header">
+      <div>
+        <p class="sheet-eyebrow" data-i18n="newHabit">新习惯</p>
+        <h2 id="habit-sheet-title" data-i18n="whatToKeep">你想坚持什么？</h2>
+      </div>
+      <button class="close-button" id="close-habit-sheet" type="button" aria-label="关闭">×</button>
+    </header>
+    <form id="habit-form">
+      <div class="field">
+        <label for="habit-name" data-i18n="habitName">习惯名称</label>
+        <input id="habit-name" name="habit-name" required maxlength="20" placeholder="例如：冥想">
+      </div>
+
+      <div class="field">
+        <span class="field-label" data-i18n="chooseIcon">选择图标</span>
+        <div class="icon-options" id="icon-options">
+          <button class="icon-choice is-selected" type="button" data-icon="sprout" aria-label="成长" aria-pressed="true"></button>
+          <button class="icon-choice" type="button" data-icon="meditation" aria-label="冥想" aria-pressed="false"></button>
+          <button class="icon-choice" type="button" data-icon="reading" aria-label="阅读" aria-pressed="false"></button>
+          <button class="icon-choice" type="button" data-icon="workout" aria-label="运动" aria-pressed="false"></button>
+          <button class="icon-choice" type="button" data-icon="water" aria-label="喝水" aria-pressed="false"></button>
+          <button class="icon-choice" type="button" data-icon="sleep" aria-label="睡眠" aria-pressed="false"></button>
+          <button class="icon-choice" type="button" data-icon="wake" aria-label="起床" aria-pressed="false"></button>
+          <button class="icon-choice" type="button" data-icon="footbath" aria-label="泡脚" aria-pressed="false"></button>
+          <button class="icon-choice" type="button" data-icon="study" aria-label="学习" aria-pressed="false"></button>
+          <button class="icon-choice" type="button" data-icon="walk" aria-label="散步" aria-pressed="false"></button>
+          <button class="icon-choice" type="button" data-icon="medicine" aria-label="用药" aria-pressed="false"></button>
+          <button class="icon-choice" type="button" data-icon="nutrition" aria-label="饮食" aria-pressed="false"></button>
+          <button class="icon-choice" type="button" data-icon="oral-care" aria-label="口腔护理" aria-pressed="false"></button>
+          <button class="icon-choice" type="button" data-icon="reminder" aria-label="提醒" aria-pressed="false"></button>
+          <button class="icon-choice icon-more-button" id="icon-more-button" type="button" aria-label="更多备用图标" aria-expanded="false">＋</button>
+        </div>
+        <div class="fallback-icon-panel" id="fallback-icon-panel" hidden>
+          <span class="field-label">字母</span>
+          <div class="fallback-icon-grid" id="letter-icon-options"></div>
+          <span class="field-label">颜色</span>
+          <div class="fallback-color-grid" id="color-icon-options"></div>
+        </div>
+        <p class="future-inline" data-i18n="futureAiIcon">未来可以用一句描述让 AI 生成专属图标</p>
+      </div>
+
+      <label class="quantify-toggle">
+        <span>
+          <strong data-i18n="quantify">记录具体数据</strong>
+          <small data-i18n="quantifyHint">例如时长、页数、时间或数值</small>
+        </span>
+        <input id="quantify-toggle" type="checkbox">
+        <span class="toggle-track" aria-hidden="true"></span>
+      </label>
+
+      <div id="quantify-fields" hidden>
+        <div class="field">
+          <label for="metric-type" data-i18n="whatToRecord">想记录什么？</label>
+          <select id="metric-type">
+            <option value="duration" data-i18n="duration">时长</option>
+            <option value="count" data-i18n="count">次数</option>
+            <option value="number" data-i18n="number">数值</option>
+            <option value="time" data-i18n="time">时间</option>
+          </select>
+        </div>
+        <div class="field-pair">
+          <div class="field">
+            <label for="habit-target" data-i18n="target">计划</label>
+            <input id="habit-target" type="number" min="1" value="30">
+          </div>
+          <div class="field">
+            <label for="habit-unit" data-i18n="unit">单位</label>
+            <select id="habit-unit">
+              <option value="分钟">分钟</option>
+              <option value="次">次</option>
+              <option value="">不选择单位</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="field-label" data-i18n="frequency">多久一次？</span>
+        <div class="frequency-options" id="frequency-options">
+          <button class="frequency-choice is-selected" type="button" data-frequency="daily" aria-pressed="true" data-i18n="everyDay">每天</button>
+          <button class="frequency-choice" type="button" data-frequency="weekdays" aria-pressed="false" data-i18n="selectedDays">每周指定</button>
+          <button class="frequency-choice" type="button" data-frequency="weekly" aria-pressed="false" data-i18n="timesPerWeek">每周几次</button>
+          <button class="frequency-choice" type="button" data-frequency="interval" aria-pressed="false" data-i18n="everyNDays">每隔几天</button>
+        </div>
+      </div>
+
+      <div class="frequency-detail" id="weekdays-detail" hidden>
+        <span class="field-label" data-i18n="chooseDays">选择星期</span>
+        <div class="weekday-options" id="weekday-options"></div>
+      </div>
+
+      <div class="field frequency-detail" id="weekly-detail" hidden>
+        <label for="weekly-count" data-i18n="weeklyCount">每周完成几次？</label>
+        <input id="weekly-count" type="number" min="1" max="7" value="3">
+      </div>
+
+      <div class="field frequency-detail" id="interval-detail" hidden>
+        <label for="interval-days" data-i18n="intervalDays">每隔几天？</label>
+        <input id="interval-days" type="number" min="2" max="30" value="2">
+      </div>
+
+      <label class="quantify-toggle notes-toggle">
+        <span>
+          <strong data-i18n="addNotes">打卡时可以添加备注</strong>
+          <small data-i18n="addNotesHint">支持文字、图片和语音输入</small>
+        </span>
+        <input id="notes-toggle" type="checkbox">
+        <span class="toggle-track" aria-hidden="true"></span>
+      </label>
+      <p class="future-inline" data-i18n="futurePhotoAi">未来可让 AI 识别图片并生成文字描述</p>
+
+      <input id="editing-habit-id" type="hidden">
+      <button class="save-button" id="save-habit-button" type="submit" data-i18n="createHabit">创建习惯</button>
+    </form>
+  </section>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="./app.js"></script>
+</body>
+</html>
