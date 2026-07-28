@@ -827,6 +827,8 @@
       tokenInput.focus();
       return;
     }
+    if (remember.checked) localStorage.setItem(AI_TOKEN_STORAGE_KEY, token);
+    else localStorage.removeItem(AI_TOKEN_STORAGE_KEY);
     button.disabled = true;
     button.textContent = t().recognizing;
     status.textContent = t().recognizing;
@@ -845,8 +847,6 @@
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
-      if (remember.checked) localStorage.setItem(AI_TOKEN_STORAGE_KEY, token);
-      else localStorage.removeItem(AI_TOKEN_STORAGE_KEY);
       aiRecognitionResults.set(model, payload.result || payload);
       renderAiResults(habit);
       status.textContent = '';
@@ -884,6 +884,13 @@
     const remember = document.getElementById('ai-remember-token');
     if (tokenInput) tokenInput.value = savedToken;
     if (remember) remember.checked = true;
+    const persistTokenChoice = () => {
+      const token = tokenInput?.value.trim() || '';
+      if (remember?.checked && token) localStorage.setItem(AI_TOKEN_STORAGE_KEY, token);
+      else localStorage.removeItem(AI_TOKEN_STORAGE_KEY);
+    };
+    tokenInput?.addEventListener('change', persistTokenChoice);
+    remember?.addEventListener('change', persistTokenChoice);
     document.getElementById('ai-recognize-button')?.addEventListener('click', () => analyzeSelectedImage(habit));
     const voiceButton = document.getElementById('voice-prototype-button');
     if (voiceButton) {
