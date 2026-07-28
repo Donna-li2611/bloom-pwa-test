@@ -1,5 +1,11 @@
 (() => {
   const STORAGE_KEY = 'bloom-prototype-v02-r2';
+  const AI_ENDPOINT = 'https://bloom-ition-api-jtcsdtmpit.cn-beijing.fcapp.run';
+  const AI_TOKEN_STORAGE_KEY = 'bloom-ai-test-token';
+  const AI_MODELS = [
+    { id: 'qwen3.7-plus', labelZh: '3.7 · 效果优先', labelEn: '3.7 · Best quality' },
+    { id: 'qwen3.5-plus-2026-04-20', labelZh: '3.5 · 成本优先', labelEn: '3.5 · Lower cost' },
+  ];
   const weekdayKeys = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
   const bedtimeHistory = ['23:18', '23:42', '23:25', '23:08', '23:51', '23:22', '23:42'];
   const wakeHistory = ['06:54', '07:12', '06:48', '06:58', '07:18', '06:51', '06:52'];
@@ -71,6 +77,23 @@
       photo: '图片',
       voice: '语音',
       futurePhotoAi: '未来可让 AI 识别图片并生成文字描述',
+      aiImageRecognition: 'AI 图片识别',
+      aiRecognitionHint: '选择模型后识别；结果不会自动保存。',
+      aiAccessToken: 'Bloom 测试密码',
+      aiAccessTokenHint: '只保存在这台设备，不会写入公开网页代码。',
+      rememberOnDevice: '保存在这台设备',
+      recognizeImage: '识别这张图片',
+      recognizing: '正在识别…',
+      selectPhotoFirst: '请先选择一张图片',
+      tokenRequired: '请输入 Bloom 测试密码',
+      recognitionFailed: '识别失败，请稍后重试',
+      useAsNote: '写入备注',
+      useDetectedValue: '使用识别数值',
+      confidence: '可信度',
+      detectedText: '图片文字',
+      uncertainties: '需要确认',
+      noExtraDetails: '没有额外信息',
+      resultWritten: '识别结果已写入备注，请确认后保存',
       futureAiIcon: '未来可以用一句描述让 AI 生成专属图标',
       notePlaceholder: '写下一点感受或补充…',
       choosePhoto: '选择图片',
@@ -181,6 +204,23 @@
       photo: 'Photo',
       voice: 'Voice',
       futurePhotoAi: 'AI may turn a photo into a text description later',
+      aiImageRecognition: 'AI image recognition',
+      aiRecognitionHint: 'Choose a model to analyze. Results are not saved automatically.',
+      aiAccessToken: 'Bloom test password',
+      aiAccessTokenHint: 'Stored only on this device, never in the public website code.',
+      rememberOnDevice: 'Save on this device',
+      recognizeImage: 'Analyze this photo',
+      recognizing: 'Analyzing…',
+      selectPhotoFirst: 'Choose a photo first',
+      tokenRequired: 'Enter the Bloom test password',
+      recognitionFailed: 'Recognition failed. Please try again.',
+      useAsNote: 'Add to note',
+      useDetectedValue: 'Use detected value',
+      confidence: 'Confidence',
+      detectedText: 'Detected text',
+      uncertainties: 'Needs confirmation',
+      noExtraDetails: 'No additional details',
+      resultWritten: 'Result added to the note. Review it before saving.',
       futureAiIcon: 'Describe an idea to generate a personal AI icon later',
       notePlaceholder: 'Add a feeling or detail…',
       choosePhoto: 'Choose photo',
@@ -287,6 +327,8 @@
 
   let state = loadState();
   let activeHabitId = null;
+  let selectedCheckinImageDataUrl = '';
+  let aiRecognitionResults = new Map();
   let selectedIcon = 'sprout';
   let selectedFrequency = 'daily';
   let reviewPeriod = 'week';
@@ -647,22 +689,203 @@
             <button class="voice-prototype-button" id="voice-prototype-button" type="button">◉ ${t().voice}</button>
           </div>
           <img class="attachment-preview" id="attachment-preview" alt="" hidden>
+          <section class="ai-recognition-panel" id="ai-recognition-panel" hidden>
+            <div class="ai-panel-heading">
+              <strong>${t().aiImageRecognition}</strong>
+              <span>${t().aiRecognitionHint}</span>
+            </div>
+            <div class="ai-token-fields" id="ai-token-fields">
+              <label for="ai-access-token">${t().aiAccessToken}</label>
+              <input id="ai-access-token" type="password" autocomplete="off" placeholder="${t().aiAccessToken}">
+              <label class="ai-remember-choice">
+                <input id="ai-remember-token" type="checkbox">
+                <span>${t().rememberOnDevice}</span>
+              </label>
+              <small>${t().aiAccessTokenHint}</small>
+            </div>
+            <div class="ai-controls">
+              <select id="ai-model" aria-label="${t().aiImageRecognition}">
+                ${AI_MODELS.map((model) => `<option value="${model.id}">${state.language === 'zh' ? model.labelZh : model.labelEn}</option>`).join('')}
+              </select>
+              <button class="ai-recognize-button" id="ai-recognize-button" type="button">${t().recognizeImage}</button>
+            </div>
+            <p class="ai-status" id="ai-status" aria-live="polite"></p>
+            <div class="ai-results" id="ai-results"></div>
+          </section>
         </div>
       </div>
     `;
   };
 
-  const setupOptionalInputs = () => {
+  const fileToCompressedDataUrl = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('read_failed'));
+    reader.onload = () => {
+      const image = new Image();
+      image.onerror = () => reject(new Error('image_failed'));
+      image.onload = () => {
+        const maxEdge = 1280;
+        const scale = Math.min(1, maxEdge / Math.max(image.naturalWidth, image.naturalHeight));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+        const context = canvas.getContext('2d');
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      image.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  });
+
+  const resultValue = (result) => {
+    if (!Array.isArray(result?.values)) return null;
+    return result.values.find((item) => Number.isFinite(Number(item?.value)));
+  };
+
+  const renderAiResults = (habit) => {
+    const container = document.getElementById('ai-results');
+    if (!container) return;
+    container.replaceChildren();
+    AI_MODELS.forEach((model) => {
+      const result = aiRecognitionResults.get(model.id);
+      if (!result) return;
+      const card = document.createElement('article');
+      card.className = 'ai-result-card';
+
+      const title = document.createElement('strong');
+      title.textContent = state.language === 'zh' ? model.labelZh : model.labelEn;
+      card.appendChild(title);
+
+      const description = document.createElement('p');
+      description.className = 'ai-description';
+      description.textContent = result.description || t().noExtraDetails;
+      card.appendChild(description);
+
+      const metaItems = [];
+      if (result.detected_text) metaItems.push(`${t().detectedText}：${result.detected_text}`);
+      if (Array.isArray(result.uncertainties) && result.uncertainties.length) {
+        metaItems.push(`${t().uncertainties}：${result.uncertainties.join('、')}`);
+      }
+      if (result.confidence !== undefined) {
+        const confidenceLabels = state.language === 'zh'
+          ? { high: '高', medium: '中', low: '低' }
+          : { high: 'High', medium: 'Medium', low: 'Low' };
+        const confidenceText = confidenceLabels[result.confidence] || String(result.confidence);
+        metaItems.push(`${t().confidence}：${confidenceText}`);
+      }
+      if (metaItems.length) {
+        const meta = document.createElement('p');
+        meta.className = 'ai-result-meta';
+        meta.textContent = metaItems.join('\n');
+        card.appendChild(meta);
+      }
+
+      const actions = document.createElement('div');
+      actions.className = 'ai-result-actions';
+      const useNote = document.createElement('button');
+      useNote.type = 'button';
+      useNote.textContent = t().useAsNote;
+      useNote.addEventListener('click', () => {
+        const note = document.getElementById('record-note');
+        if (note) note.value = `${note.value}${note.value ? '\n' : ''}${result.description || ''}`.trim();
+        document.getElementById('ai-status').textContent = t().resultWritten;
+      });
+      actions.appendChild(useNote);
+
+      const detectedValue = resultValue(result);
+      const valueInput = habit.kind === 'weight'
+        ? document.getElementById('weight-value')
+        : habit.kind === 'custom' ? document.getElementById('custom-value') : null;
+      if (detectedValue && valueInput) {
+        const useValue = document.createElement('button');
+        useValue.type = 'button';
+        useValue.textContent = `${t().useDetectedValue} ${detectedValue.value}${detectedValue.unit ? ` ${detectedValue.unit}` : ''}`;
+        useValue.addEventListener('click', () => {
+          valueInput.value = String(detectedValue.value);
+        });
+        actions.appendChild(useValue);
+      }
+      card.appendChild(actions);
+      container.appendChild(card);
+    });
+  };
+
+  const analyzeSelectedImage = async (habit) => {
+    const status = document.getElementById('ai-status');
+    const button = document.getElementById('ai-recognize-button');
+    const tokenInput = document.getElementById('ai-access-token');
+    const remember = document.getElementById('ai-remember-token');
+    const model = document.getElementById('ai-model').value;
+    const token = tokenInput.value.trim();
+    if (!selectedCheckinImageDataUrl) {
+      status.textContent = t().selectPhotoFirst;
+      return;
+    }
+    if (!token) {
+      status.textContent = t().tokenRequired;
+      tokenInput.focus();
+      return;
+    }
+    if (remember.checked) localStorage.setItem(AI_TOKEN_STORAGE_KEY, token);
+    else localStorage.removeItem(AI_TOKEN_STORAGE_KEY);
+
+    button.disabled = true;
+    button.textContent = t().recognizing;
+    status.textContent = t().recognizing;
+    try {
+      const response = await fetch(`${AI_ENDPOINT}/api/analyze-image`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Bloom-Access-Token': token,
+        },
+        body: JSON.stringify({
+          model,
+          context: habitName(habit),
+          imageDataUrl: selectedCheckinImageDataUrl,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+      aiRecognitionResults.set(model, payload.result || payload);
+      renderAiResults(habit);
+      status.textContent = '';
+    } catch (error) {
+      status.textContent = `${t().recognitionFailed}（${error.message}）`;
+    } finally {
+      button.disabled = false;
+      button.textContent = t().recognizeImage;
+    }
+  };
+
+  const setupOptionalInputs = (habit) => {
     const photoInput = document.getElementById('record-photo');
     if (photoInput) {
-      photoInput.addEventListener('change', () => {
+      photoInput.addEventListener('change', async () => {
         const file = photoInput.files?.[0];
         if (!file) return;
         const preview = document.getElementById('attachment-preview');
         preview.src = URL.createObjectURL(file);
         preview.hidden = false;
+        const panel = document.getElementById('ai-recognition-panel');
+        const status = document.getElementById('ai-status');
+        panel.hidden = false;
+        status.textContent = '';
+        try {
+          selectedCheckinImageDataUrl = await fileToCompressedDataUrl(file);
+        } catch {
+          selectedCheckinImageDataUrl = '';
+          status.textContent = t().recognitionFailed;
+        }
       });
     }
+    const savedToken = localStorage.getItem(AI_TOKEN_STORAGE_KEY) || '';
+    const tokenInput = document.getElementById('ai-access-token');
+    const remember = document.getElementById('ai-remember-token');
+    if (tokenInput) tokenInput.value = savedToken;
+    if (remember) remember.checked = Boolean(savedToken);
+    document.getElementById('ai-recognize-button')?.addEventListener('click', () => analyzeSelectedImage(habit));
     const voiceButton = document.getElementById('voice-prototype-button');
     if (voiceButton) {
       voiceButton.addEventListener('click', () => {
@@ -676,6 +899,8 @@
   const openCheckin = (habitId) => {
     const habit = state.habits.find((item) => item.id === habitId);
     activeHabitId = habitId;
+    selectedCheckinImageDataUrl = '';
+    aiRecognitionResults = new Map();
     document.getElementById('sheet-title').textContent = habitName(habit);
     elements.result.textContent = '';
 
@@ -744,7 +969,7 @@
       }
     }
     openLayer(elements.sheet);
-    setupOptionalInputs();
+    setupOptionalInputs(habit);
   };
 
   const saveCheckin = () => {
