@@ -1117,22 +1117,25 @@
     }
     if (!readingSession.images.length) return;
     readingSession.loading = true;
-    readingSession.status = '正在识别，请稍候…';
+    readingSession.status = `正在逐张识别（共 ${readingSession.images.length} 张）…`;
     renderReadingPhotos();
     try {
-      const response = await fetch(`${AI_ENDPOINT}/api/reading/ocr`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Bloom-Access-Token': token },
-        body: JSON.stringify({
-          model: readingSession.model,
-          images: readingSession.images.map((image) => image.dataUrl),
-        }),
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
-      readingSession.ocrByImage = new Map(
-        payload.pages.map((page, index) => [readingSession.images[index].id, page.text || ''])
-      );
+      const results = await Promise.all(readingSession.images.map(async (image, index) => {
+        const response = await fetch(`${AI_ENDPOINT}/api/reading/ocr`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Bloom-Access-Token': token },
+          body: JSON.stringify({
+            model: readingSession.model,
+            images: [image.dataUrl],
+          }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(`第 ${index + 1} 张：${payload.error || `HTTP ${response.status}`}`);
+        }
+        return [image.id, payload.pages?.[0]?.text || ''];
+      }));
+      readingSession.ocrByImage = new Map(results);
       readingSession.mergedSource = mergedReadingSource();
       readingSession.activeSourceId = readingSession.images[0].id;
       readingSession.step = 'source';

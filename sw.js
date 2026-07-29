@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bloom-pwa-v6';
+const CACHE_NAME = 'bloom-pwa-v7';
 const APP_SHELL = [
   './',
   './index.html',
