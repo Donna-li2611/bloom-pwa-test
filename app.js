@@ -998,7 +998,13 @@
   };
 
   const renderReadingSource = () => {
-    if (!readingSession.activeSourceId || !readingSession.images.some((image) => image.id === readingSession.activeSourceId)) {
+    if (
+      !readingSession.activeSourceId
+      || (
+        readingSession.activeSourceId !== 'all'
+        && !readingSession.images.some((image) => image.id === readingSession.activeSourceId)
+      )
+    ) {
       readingSession.activeSourceId = readingSession.images[0]?.id || 'all';
     }
     const isMerged = readingSession.activeSourceId === 'all';
