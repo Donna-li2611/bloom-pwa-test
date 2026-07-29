@@ -1150,6 +1150,17 @@
     else readingSession.ocrByImage.set(readingSession.activeSourceId, editor.value);
   };
 
+  const confirmCompleteReadingSource = () => {
+    saveActiveReadingSource();
+    if (readingSession.activeSourceId !== 'all') {
+      readingSession.mergedSource = mergedReadingSource();
+    }
+    readingSession.confirmedSource = (
+      readingSession.mergedSource || mergedReadingSource()
+    ).trim();
+    return readingSession.confirmedSource;
+  };
+
   const renderReadingLightbox = (imageId) => {
     const image = readingSession.images.find((item) => item.id === imageId);
     if (!image) return;
@@ -1263,7 +1274,7 @@
             <button type="button" data-reading-action="ai-reflection">${readingSession.loading ? '生成中…' : 'AI 辅助'}</button>
           </div>
           <textarea id="reading-reflection-editor" class="reading-reflection-editor" placeholder="写下此刻真正打动你的内容……"></textarea>
-          <p class="reading-helper">AI 初稿可以删除、重写，最终只保存你确认后的版本。</p>
+          <p class="reading-helper">AI 将基于你在“原文”页最终确认的完整合并原文生成初稿；初稿可以删除、重写。</p>
         </section>
         <p class="reading-status" id="reading-status" aria-live="polite">${readingSession.status || ''}</p>
         <button class="reading-primary-button" type="button" data-reading-action="go-preview">预览完整记录</button>
@@ -1308,7 +1319,7 @@
     try {
       const title = await requestRecordTitle({
         type: 'reading',
-        sourceText: readingSession.mergedSource || mergedReadingSource(),
+        sourceText: readingSession.confirmedSource || confirmCompleteReadingSource(),
         reflection: readingSession.reflection,
         metrics: `${readingSession.minutes} 分钟，${readingSession.pages} 页`,
         model: readingSession.model,
@@ -1437,15 +1448,14 @@
   };
 
   const runReadingReflection = async () => {
-    saveActiveReadingSource();
-    if (readingSession.activeSourceId !== 'all') readingSession.mergedSource = mergedReadingSource();
+    const completeSource = confirmCompleteReadingSource();
     const token = getReadingToken();
     if (!token) {
       readingSession.status = '请先回到图片页输入 Bloom 测试密码';
       renderReadingReflection();
       return;
     }
-    if (!readingSession.mergedSource.trim()) {
+    if (!completeSource) {
       readingSession.status = '请先确认摘录原文';
       renderReadingReflection();
       return;
@@ -1457,7 +1467,7 @@
       const response = await fetch(`${AI_ENDPOINT}/api/reading/reflection`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Bloom-Access-Token': token },
-        body: JSON.stringify({ model: readingSession.model, sourceText: readingSession.mergedSource }),
+        body: JSON.stringify({ model: readingSession.model, sourceText: completeSource }),
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
@@ -1476,7 +1486,7 @@
     syncReadingTitle();
     readingSession.title = readingSession.title || fallbackRecordTitle(
       'reading',
-      readingSession.mergedSource || mergedReadingSource(),
+      readingSession.confirmedSource || confirmCompleteReadingSource(),
       readingSession.reflection,
     );
     const previousRecords = [...state.records];
@@ -1499,7 +1509,7 @@
       createdAt: new Date().toISOString(),
       title: readingSession.title,
       images: readingSession.images.map((image) => image.dataUrl),
-      sourceText: readingSession.mergedSource || mergedReadingSource(),
+      sourceText: readingSession.confirmedSource || confirmCompleteReadingSource(),
       reflection: readingSession.reflection,
     };
     state.records.unshift({
@@ -1534,6 +1544,7 @@
     renderAll();
     readingSession.step = 'saved';
     renderReadingStep();
+    showToast('保存成功，可在“记录”中查看');
   };
 
   const syncReadingMetrics = () => {
@@ -1595,8 +1606,7 @@
       if (type === 'go-reflection') {
         const reflectionEditor = document.getElementById('reading-reflection-editor');
         if (reflectionEditor) readingSession.reflection = reflectionEditor.value;
-        saveActiveReadingSource();
-        if (readingSession.activeSourceId !== 'all') readingSession.mergedSource = mergedReadingSource();
+        confirmCompleteReadingSource();
         readingSession.step = 'reflection';
         renderReadingStep();
       }
@@ -1623,9 +1633,10 @@
         }
         const reflectionEditor = document.getElementById('reading-reflection-editor');
         if (reflectionEditor) readingSession.reflection = reflectionEditor.value;
-        saveActiveReadingSource();
-        if (readingSession.activeSourceId !== 'all' && ['reflection', 'preview'].includes(target)) {
-          readingSession.mergedSource = mergedReadingSource();
+        if (['reflection', 'preview'].includes(target)) {
+          confirmCompleteReadingSource();
+        } else {
+          saveActiveReadingSource();
         }
         readingSession.step = target;
         renderReadingStep();
@@ -1702,6 +1713,7 @@
         ocrByImage: new Map(),
         activeSourceId: '',
         mergedSource: '',
+        confirmedSource: '',
         reflection: '',
         title: '',
         titleStatus: '',
