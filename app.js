@@ -1028,10 +1028,6 @@
           </div>
           <textarea id="reading-source-editor" class="reading-source-editor"></textarea>
           <p class="reading-helper">${isMerged ? '这是按图片顺序合并的完整原文，仍可继续最终修改。' : `正在对照图片 ${activeIndex + 1} 修改原文。`}</p>
-          <div class="reading-inline-actions">
-            <button type="button" data-reading-action="fix-breaks">修复 OCR 断行</button>
-            <button type="button" data-reading-action="merge-source">重新按顺序合并</button>
-          </div>
         </section>
         <button class="reading-primary-button" type="button" data-reading-action="go-reflection">原文修改完成</button>
       </div>
@@ -1256,10 +1252,6 @@
         readingSession.mergedSource = mergedReadingSource();
         readingSession.activeSourceId = 'all';
         renderReadingSource();
-      }
-      if (type === 'fix-breaks') {
-        const editor = document.getElementById('reading-source-editor');
-        editor.value = editor.value.replace(/([^\n])\n(?!\n)/g, '$1').replace(/\n{3,}/g, '\n\n').trim();
       }
       if (type === 'go-reflection') {
         const reflectionEditor = document.getElementById('reading-reflection-editor');
