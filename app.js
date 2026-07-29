@@ -329,6 +329,7 @@
   let activeHabitId = null;
   let selectedCheckinImageDataUrl = '';
   let aiRecognitionResults = new Map();
+  let readingSession = null;
   let selectedIcon = 'sprout';
   let selectedFrequency = 'daily';
   let reviewPeriod = 'week';
@@ -669,6 +670,7 @@
     elements.habitSheet.hidden = true;
     document.body.style.overflow = '';
     activeHabitId = null;
+    readingSession = null;
   };
 
   const field = (label, input) => `<div class="field"><label>${label}</label>${input}</div>`;
@@ -717,21 +719,20 @@
     `;
   };
 
-  const fileToCompressedDataUrl = (file) => new Promise((resolve, reject) => {
+  const fileToCompressedDataUrl = (file, maxEdge = 1280, quality = 0.85) => new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error('read_failed'));
     reader.onload = () => {
       const image = new Image();
       image.onerror = () => reject(new Error('image_failed'));
       image.onload = () => {
-        const maxEdge = 1280;
         const scale = Math.min(1, maxEdge / Math.max(image.naturalWidth, image.naturalHeight));
         const canvas = document.createElement('canvas');
         canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
         canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
         const context = canvas.getContext('2d');
         context.drawImage(image, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/jpeg', 0.85));
+        resolve(canvas.toDataURL('image/jpeg', quality));
       };
       image.src = String(reader.result);
     };
@@ -902,9 +903,417 @@
     }
   };
 
+  const readingModelOptions = () => AI_MODELS.map((model) => `
+    <option value="${model.id}" ${readingSession.model === model.id ? 'selected' : ''}>${state.language === 'zh' ? model.labelZh : model.labelEn}</option>
+  `).join('');
+
+  const readingPhotoCards = () => readingSession.images.map((image, index) => `
+    <article class="reading-photo-card">
+      <button class="reading-photo-preview" type="button" data-reading-action="enlarge" data-image-id="${image.id}" aria-label="放大图片 ${index + 1}">
+        <img src="${image.dataUrl}" alt="阅读图片 ${index + 1}">
+      </button>
+      <span class="reading-photo-index">${index + 1}</span>
+      <button class="reading-photo-remove" type="button" data-reading-action="remove-image" data-image-id="${image.id}" aria-label="删除图片 ${index + 1}">×</button>
+    </article>
+  `).join('');
+
+  const readingStepNavigation = () => {
+    const labels = [
+      ['photos', '图片'],
+      ['source', '原文'],
+      ['reflection', '感悟'],
+      ['preview', '保存'],
+    ];
+    return `
+      <nav class="reading-steps" aria-label="阅读记录步骤">
+        ${labels.map(([step, label], index) => `
+          <button class="reading-step ${readingSession.step === step ? 'is-active' : ''}" type="button" data-reading-action="step" data-step="${step}">
+            <span>${index + 1}</span>${label}
+          </button>
+        `).join('')}
+      </nav>
+    `;
+  };
+
+  const mergedReadingSource = () => readingSession.images
+    .map((image) => (readingSession.ocrByImage.get(image.id) || '').trim())
+    .filter(Boolean)
+    .join('\n\n');
+
+  const saveActiveReadingSource = () => {
+    const editor = document.getElementById('reading-source-editor');
+    if (!editor) return;
+    if (readingSession.activeSourceId === 'all') readingSession.mergedSource = editor.value;
+    else readingSession.ocrByImage.set(readingSession.activeSourceId, editor.value);
+  };
+
+  const renderReadingLightbox = (imageId) => {
+    const image = readingSession.images.find((item) => item.id === imageId);
+    if (!image) return;
+    const lightbox = document.createElement('div');
+    lightbox.className = 'reading-lightbox';
+    lightbox.innerHTML = `
+      <button type="button" class="reading-lightbox-close" aria-label="关闭大图">×</button>
+      <img src="${image.dataUrl}" alt="放大的阅读图片">
+    `;
+    lightbox.querySelector('button').addEventListener('click', () => lightbox.remove());
+    lightbox.addEventListener('click', (event) => {
+      if (event.target === lightbox) lightbox.remove();
+    });
+    elements.sheet.appendChild(lightbox);
+  };
+
+  const renderReadingPhotos = () => {
+    const token = localStorage.getItem(AI_TOKEN_STORAGE_KEY) || '';
+    elements.fields.innerHTML = `
+      <div class="reading-flow">
+        ${readingStepNavigation()}
+        <div class="field-pair">
+          ${field(t().minutes, `<input id="reading-minutes" type="number" min="0" value="${readingSession.minutes}" required>`)}
+          ${field(t().pages, `<input id="reading-pages" type="number" min="0" value="${readingSession.pages}" required>`)}
+        </div>
+        <section class="reading-panel">
+          <div class="reading-section-head">
+            <div><strong>阅读图片</strong><small>支持相册或拍照，最多 9 张</small></div>
+            <span>${readingSession.images.length} / 9</span>
+          </div>
+          <div class="reading-photo-grid">
+            ${readingPhotoCards()}
+            ${readingSession.images.length < 9 ? '<label class="reading-add-photo" for="reading-photo-input">＋<span>添加图片</span></label>' : ''}
+          </div>
+          <input id="reading-photo-input" type="file" accept="image/*" multiple hidden>
+        </section>
+        <section class="reading-ai-access">
+          ${token
+            ? '<span class="reading-connected">✓ AI 服务已连接</span>'
+            : '<label for="reading-access-token">Bloom 测试密码</label><input id="reading-access-token" type="password" autocomplete="off">'}
+          <select id="reading-model">${readingModelOptions()}</select>
+        </section>
+        <p class="reading-status" id="reading-status" aria-live="polite">${readingSession.status || ''}</p>
+        <button class="reading-primary-button" type="button" data-reading-action="ocr" ${readingSession.images.length ? '' : 'disabled'}>
+          ${readingSession.loading ? '正在识别全部图片…' : '识别全部图片'}
+        </button>
+      </div>
+    `;
+  };
+
+  const renderReadingSource = () => {
+    if (!readingSession.activeSourceId || !readingSession.images.some((image) => image.id === readingSession.activeSourceId)) {
+      readingSession.activeSourceId = readingSession.images[0]?.id || 'all';
+    }
+    const isMerged = readingSession.activeSourceId === 'all';
+    const activeText = isMerged
+      ? readingSession.mergedSource || mergedReadingSource()
+      : readingSession.ocrByImage.get(readingSession.activeSourceId) || '';
+    const activeIndex = readingSession.images.findIndex((image) => image.id === readingSession.activeSourceId);
+    elements.fields.innerHTML = `
+      <div class="reading-flow">
+        ${readingStepNavigation()}
+        <section class="reading-panel">
+          <div class="reading-section-head">
+            <div><strong>逐张校对原文</strong><small>切换图片时会自动保留修改</small></div>
+            <span>OCR 完成</span>
+          </div>
+          <div class="reading-source-tabs">
+            ${readingSession.images.map((image, index) => `
+              <button class="${readingSession.activeSourceId === image.id ? 'is-active' : ''}" type="button" data-reading-action="source-tab" data-image-id="${image.id}">图片 ${index + 1}</button>
+            `).join('')}
+            <button class="${isMerged ? 'is-active' : ''}" type="button" data-reading-action="merge-source">合并原文</button>
+          </div>
+          <textarea id="reading-source-editor" class="reading-source-editor"></textarea>
+          <p class="reading-helper">${isMerged ? '这是按图片顺序合并的完整原文，仍可继续最终修改。' : `正在对照图片 ${activeIndex + 1} 修改原文。`}</p>
+          <div class="reading-inline-actions">
+            <button type="button" data-reading-action="fix-breaks">修复 OCR 断行</button>
+            <button type="button" data-reading-action="merge-source">重新按顺序合并</button>
+          </div>
+        </section>
+        <button class="reading-primary-button" type="button" data-reading-action="go-reflection">原文修改完成</button>
+      </div>
+    `;
+    document.getElementById('reading-source-editor').value = activeText;
+  };
+
+  const renderReadingReflection = () => {
+    elements.fields.innerHTML = `
+      <div class="reading-flow">
+        ${readingStepNavigation()}
+        <section class="reading-panel">
+          <div class="reading-section-head">
+            <div><strong>我的感悟</strong><small>自己写，或让 AI 提供一个简短起点</small></div>
+            <button type="button" data-reading-action="ai-reflection">${readingSession.loading ? '生成中…' : 'AI 辅助'}</button>
+          </div>
+          <textarea id="reading-reflection-editor" class="reading-reflection-editor" placeholder="写下此刻真正打动你的内容……"></textarea>
+          <p class="reading-helper">AI 初稿可以删除、重写，最终只保存你确认后的版本。</p>
+        </section>
+        <p class="reading-status" id="reading-status" aria-live="polite">${readingSession.status || ''}</p>
+        <button class="reading-primary-button" type="button" data-reading-action="go-preview">预览完整记录</button>
+      </div>
+    `;
+    document.getElementById('reading-reflection-editor').value = readingSession.reflection;
+  };
+
+  const renderReadingPreview = (saved = false) => {
+    const source = readingSession.mergedSource || mergedReadingSource();
+    elements.fields.innerHTML = `
+      <div class="reading-flow">
+        ${saved ? '<div class="reading-success">✓ 保存成功，可在“记录”中查看</div>' : readingStepNavigation()}
+        <section class="reading-panel">
+          <div class="reading-section-head">
+            <div><strong>${saved ? '阅读记录' : '阅读记录预览'}</strong><small>${saved ? new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric' }).format(new Date()) : '三部分将作为同一条记录保存'}</small></div>
+            <span>${saved ? '已保存' : '未保存'}</span>
+          </div>
+          <div class="reading-record-section">
+            <strong>图片 · ${readingSession.images.length} 张</strong>
+            <div class="reading-preview-images">
+              ${readingSession.images.map((image, index) => `
+                <button type="button" data-reading-action="enlarge" data-image-id="${image.id}" aria-label="放大图片 ${index + 1}">
+                  <img src="${image.dataUrl}" alt="阅读图片 ${index + 1}">
+                </button>
+              `).join('')}
+            </div>
+          </div>
+          <div class="reading-record-section">
+            <strong>摘录原文</strong>
+            <p>${source ? '' : '尚未保留原文'}</p>
+            <div class="reading-record-copy" id="reading-source-preview"></div>
+          </div>
+          <div class="reading-record-section">
+            <strong>我的感悟</strong>
+            <p id="reading-reflection-preview"></p>
+          </div>
+        </section>
+        ${saved
+          ? ''
+          : '<div class="reading-bottom-actions"><button type="button" data-reading-action="go-reflection">返回修改</button><button class="reading-primary-button" type="button" data-reading-action="save">保存图片、原文与感悟</button></div>'}
+      </div>
+    `;
+    document.getElementById('reading-source-preview').textContent = source;
+    document.getElementById('reading-reflection-preview').textContent = readingSession.reflection || '尚未填写感悟';
+  };
+
+  const renderReadingStep = () => {
+    const saveButton = document.querySelector('#checkin-form > .save-button');
+    saveButton.hidden = true;
+    if (readingSession.step === 'photos') renderReadingPhotos();
+    else if (readingSession.step === 'source') renderReadingSource();
+    else if (readingSession.step === 'reflection') renderReadingReflection();
+    else renderReadingPreview(readingSession.step === 'saved');
+  };
+
+  const getReadingToken = () => {
+    const input = document.getElementById('reading-access-token');
+    const token = input?.value.trim() || localStorage.getItem(AI_TOKEN_STORAGE_KEY) || '';
+    if (input && token) localStorage.setItem(AI_TOKEN_STORAGE_KEY, token);
+    return token;
+  };
+
+  const runReadingOcr = async () => {
+    const token = getReadingToken();
+    if (!token) {
+      readingSession.status = '请先输入 Bloom 测试密码';
+      renderReadingPhotos();
+      document.getElementById('reading-access-token')?.focus();
+      return;
+    }
+    if (!readingSession.images.length) return;
+    readingSession.loading = true;
+    readingSession.status = '正在识别，请稍候…';
+    renderReadingPhotos();
+    try {
+      const response = await fetch(`${AI_ENDPOINT}/api/reading/ocr`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Bloom-Access-Token': token },
+        body: JSON.stringify({
+          model: readingSession.model,
+          images: readingSession.images.map((image) => image.dataUrl),
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+      readingSession.ocrByImage = new Map(
+        payload.pages.map((page, index) => [readingSession.images[index].id, page.text || ''])
+      );
+      readingSession.mergedSource = mergedReadingSource();
+      readingSession.activeSourceId = readingSession.images[0].id;
+      readingSession.step = 'source';
+      readingSession.status = '';
+    } catch (error) {
+      readingSession.status = `识别失败：${error.message}`;
+    } finally {
+      readingSession.loading = false;
+      renderReadingStep();
+    }
+  };
+
+  const runReadingReflection = async () => {
+    saveActiveReadingSource();
+    if (readingSession.activeSourceId !== 'all') readingSession.mergedSource = mergedReadingSource();
+    const token = getReadingToken();
+    if (!token) {
+      readingSession.status = '请先回到图片页输入 Bloom 测试密码';
+      renderReadingReflection();
+      return;
+    }
+    if (!readingSession.mergedSource.trim()) {
+      readingSession.status = '请先确认摘录原文';
+      renderReadingReflection();
+      return;
+    }
+    readingSession.loading = true;
+    readingSession.status = 'AI 正在生成感悟初稿…';
+    renderReadingReflection();
+    try {
+      const response = await fetch(`${AI_ENDPOINT}/api/reading/reflection`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Bloom-Access-Token': token },
+        body: JSON.stringify({ model: readingSession.model, sourceText: readingSession.mergedSource }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+      readingSession.reflection = payload.reflection || '';
+      readingSession.status = '';
+    } catch (error) {
+      readingSession.status = `生成失败：${error.message}`;
+    } finally {
+      readingSession.loading = false;
+      renderReadingReflection();
+    }
+  };
+
+  const saveReadingRecord = () => {
+    const habit = state.habits.find((item) => item.id === activeHabitId);
+    const previousHabit = {
+      minutes: habit.minutes,
+      pages: habit.pages,
+      recorded: habit.recorded,
+      complete: habit.complete,
+      weekDone: habit.weekDone,
+      weekState: habit.weekStates[6],
+      latestReadingRecord: habit.latestReadingRecord,
+    };
+    const wasComplete = habit.complete;
+    habit.minutes = readingSession.minutes;
+    habit.pages = readingSession.pages;
+    habit.recorded = true;
+    habit.complete = habit.minutes >= habit.target;
+    habit.latestReadingRecord = {
+      id: `reading-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      images: readingSession.images.map((image) => image.dataUrl),
+      sourceText: readingSession.mergedSource || mergedReadingSource(),
+      reflection: readingSession.reflection,
+    };
+    if (!wasComplete && habit.complete) habit.weekDone = Math.min(habit.weekTarget, habit.weekDone + 1);
+    if (wasComplete && !habit.complete) habit.weekDone = Math.max(0, habit.weekDone - 1);
+    habit.weekStates[6] = habit.complete ? 'complete' : 'recorded';
+    try {
+      persist();
+    } catch {
+      habit.minutes = previousHabit.minutes;
+      habit.pages = previousHabit.pages;
+      habit.recorded = previousHabit.recorded;
+      habit.complete = previousHabit.complete;
+      habit.weekDone = previousHabit.weekDone;
+      habit.weekStates[6] = previousHabit.weekState;
+      habit.latestReadingRecord = previousHabit.latestReadingRecord;
+      readingSession.status = '图片较多，当前设备存储空间不足，请减少图片后重试';
+      renderReadingPreview(false);
+      return;
+    }
+    renderAll();
+    readingSession.step = 'saved';
+    renderReadingStep();
+  };
+
+  const setupReadingFlow = () => {
+    elements.fields.onclick = (event) => {
+      const action = event.target.closest('[data-reading-action]');
+      if (!action) return;
+      const type = action.dataset.readingAction;
+      if (type === 'enlarge') renderReadingLightbox(action.dataset.imageId);
+      if (type === 'remove-image') {
+        readingSession.images = readingSession.images.filter((image) => image.id !== action.dataset.imageId);
+        readingSession.ocrByImage.delete(action.dataset.imageId);
+        renderReadingPhotos();
+      }
+      if (type === 'ocr') runReadingOcr();
+      if (type === 'source-tab') {
+        saveActiveReadingSource();
+        readingSession.activeSourceId = action.dataset.imageId;
+        renderReadingSource();
+      }
+      if (type === 'merge-source') {
+        saveActiveReadingSource();
+        readingSession.mergedSource = mergedReadingSource();
+        readingSession.activeSourceId = 'all';
+        renderReadingSource();
+      }
+      if (type === 'fix-breaks') {
+        const editor = document.getElementById('reading-source-editor');
+        editor.value = editor.value.replace(/([^\n])\n(?!\n)/g, '$1').replace(/\n{3,}/g, '\n\n').trim();
+      }
+      if (type === 'go-reflection') {
+        const reflectionEditor = document.getElementById('reading-reflection-editor');
+        if (reflectionEditor) readingSession.reflection = reflectionEditor.value;
+        saveActiveReadingSource();
+        if (readingSession.activeSourceId !== 'all') readingSession.mergedSource = mergedReadingSource();
+        readingSession.step = 'reflection';
+        renderReadingStep();
+      }
+      if (type === 'ai-reflection') {
+        readingSession.reflection = document.getElementById('reading-reflection-editor').value;
+        runReadingReflection();
+      }
+      if (type === 'go-preview') {
+        readingSession.reflection = document.getElementById('reading-reflection-editor').value;
+        readingSession.step = 'preview';
+        renderReadingStep();
+      }
+      if (type === 'save') saveReadingRecord();
+      if (type === 'step') {
+        const target = action.dataset.step;
+        if (target !== 'photos' && !readingSession.ocrByImage.size) {
+          readingSession.status = '请先上传图片并完成识别';
+          renderReadingPhotos();
+          return;
+        }
+        const reflectionEditor = document.getElementById('reading-reflection-editor');
+        if (reflectionEditor) readingSession.reflection = reflectionEditor.value;
+        saveActiveReadingSource();
+        if (readingSession.activeSourceId !== 'all' && ['reflection', 'preview'].includes(target)) {
+          readingSession.mergedSource = mergedReadingSource();
+        }
+        readingSession.step = target;
+        renderReadingStep();
+      }
+    };
+    elements.fields.onchange = async (event) => {
+      if (event.target.id === 'reading-model') readingSession.model = event.target.value;
+      if (event.target.id === 'reading-minutes') readingSession.minutes = Number(event.target.value);
+      if (event.target.id === 'reading-pages') readingSession.pages = Number(event.target.value);
+      if (event.target.id === 'reading-photo-input') {
+        const available = 9 - readingSession.images.length;
+        const files = [...event.target.files].slice(0, available);
+        for (const file of files) {
+          try {
+            const dataUrl = await fileToCompressedDataUrl(file, 1000, 0.72);
+            readingSession.images.push({ id: `photo-${Date.now()}-${readingSession.images.length}`, dataUrl });
+          } catch {
+            readingSession.status = '有一张图片无法读取';
+          }
+        }
+        renderReadingPhotos();
+      }
+    };
+    renderReadingStep();
+  };
+
   const openCheckin = (habitId) => {
     const habit = state.habits.find((item) => item.id === habitId);
     activeHabitId = habitId;
+    elements.fields.onclick = null;
+    elements.fields.onchange = null;
+    document.querySelector('#checkin-form > .save-button').hidden = false;
     selectedCheckinImageDataUrl = '';
     aiRecognitionResults = new Map();
     document.getElementById('sheet-title').textContent = habitName(habit);
@@ -937,13 +1346,22 @@
         ${optionalCheckinFields(habit)}
       `;
     } else if (habit.kind === 'reading') {
-      elements.fields.innerHTML = `
-        <div class="field-pair">
-          ${field(t().minutes, `<input id="reading-minutes" type="number" min="0" value="${habit.minutes}" required>`)}
-          ${field(t().pages, `<input id="reading-pages" type="number" min="0" value="${habit.pages}" required>`)}
-        </div>
-        ${optionalCheckinFields(habit)}
-      `;
+      readingSession = {
+        step: 'photos',
+        images: [],
+        ocrByImage: new Map(),
+        activeSourceId: '',
+        mergedSource: '',
+        reflection: '',
+        minutes: habit.minutes,
+        pages: habit.pages,
+        model: 'qwen3.7-plus',
+        loading: false,
+        status: '',
+      };
+      openLayer(elements.sheet);
+      setupReadingFlow();
+      return;
     } else if (habit.kind === 'weight') {
       elements.fields.innerHTML = `${field(t().weight, `<input id="weight-value" type="number" min="1" step="0.1" value="${habit.value}" required>`)}${optionalCheckinFields(habit)}`;
     } else if (habit.kind === 'boolean') {
