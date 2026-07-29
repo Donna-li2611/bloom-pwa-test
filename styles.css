@@ -775,7 +775,7 @@ h2 {
 }
 
 .nav-button {
-  width: min(180px, 50%);
+  width: min(150px, 25%);
   border: 0;
   background: transparent;
   color: var(--text-muted);
@@ -1754,6 +1754,254 @@ h2 {
   transform: translate(-50%, 0);
 }
 
+.records-hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 4px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.records-hero h1 {
+  margin: 2px 0 0;
+}
+
+.record-filters {
+  display: flex;
+  gap: 6px;
+}
+
+.record-filter {
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  color: var(--text);
+  background: white;
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.record-filter.is-selected {
+  border-color: var(--green);
+  color: white;
+  background: var(--green);
+}
+
+.record-section {
+  padding-top: 24px;
+}
+
+.record-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 4px 14px;
+}
+
+.record-section-heading h2,
+.record-section-heading p {
+  margin: 0;
+}
+
+.record-section-heading p {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.record-list {
+  border-top: 1px solid var(--line);
+}
+
+.record-entry {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) 76px;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 4px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+}
+
+.record-entry-date,
+.record-entry-copy {
+  display: flex;
+  flex-direction: column;
+}
+
+.record-entry-date {
+  align-items: flex-start;
+  color: var(--text-muted);
+}
+
+.record-entry-date strong {
+  color: var(--text);
+  font-size: 23px;
+  line-height: 1.1;
+}
+
+.record-entry-copy {
+  min-width: 0;
+}
+
+.record-entry-copy > strong {
+  overflow: hidden;
+  font-size: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.record-entry-copy > span {
+  display: -webkit-box;
+  overflow: hidden;
+  margin-top: 5px;
+  color: var(--text-muted);
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.record-entry-copy > small {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 9px;
+  color: var(--text-muted);
+}
+
+.record-type-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f0a339;
+}
+
+.record-type-dot.is-reading {
+  background: var(--green);
+}
+
+.record-image-stack {
+  position: relative;
+  width: 66px;
+  height: 64px;
+  justify-self: end;
+}
+
+.record-image-stack img {
+  position: absolute;
+  top: calc(var(--stack-index) * 3px);
+  right: calc(var(--stack-index) * 7px);
+  width: 50px;
+  height: 56px;
+  border: 3px solid var(--surface);
+  border-radius: 12px;
+  object-fit: cover;
+  transform: rotate(calc((var(--stack-index) - 1) * 4deg));
+  box-shadow: 0 4px 12px rgba(55, 49, 37, 0.12);
+}
+
+.record-image-stack b {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
+  padding: 2px 6px;
+  border-radius: 10px;
+  color: white;
+  background: var(--green);
+  font-size: 10px;
+}
+
+.record-empty {
+  margin: 0;
+  padding: 24px 4px;
+  color: var(--text-muted);
+}
+
+.record-detail-date {
+  margin: 0 0 16px;
+  color: var(--text-muted);
+}
+
+.record-detail-images {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.record-detail-images button {
+  aspect-ratio: 1;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: 13px;
+  background: var(--soft);
+  cursor: pointer;
+}
+
+.record-detail-images img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.record-detail section {
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+}
+
+.record-detail h3,
+.record-detail section p {
+  margin: 0;
+}
+
+.record-detail section p {
+  margin-top: 9px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.record-title-panel {
+  padding: 16px;
+  border: 1px solid #e1d3b5;
+  border-radius: 18px;
+  background: #fffaf0;
+}
+
+.record-title-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.record-title-row input {
+  min-width: 0;
+}
+
+.record-title-row button {
+  padding: 0 12px;
+  border: 1px solid var(--green);
+  border-radius: 12px;
+  color: var(--green);
+  background: white;
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.workout-record-preview {
+  display: grid;
+  gap: 14px;
+}
+
 [hidden] {
   display: none !important;
 }
@@ -1811,6 +2059,36 @@ h2 {
     gap: 9px;
     padding-right: 10px;
     padding-left: 10px;
+  }
+
+  .records-hero {
+    align-items: flex-start;
+  }
+
+  .record-filters {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .record-filter {
+    padding: 7px 9px;
+  }
+
+  .record-entry {
+    grid-template-columns: 46px minmax(0, 1fr) 64px;
+    gap: 9px;
+  }
+
+  .record-image-stack {
+    width: 58px;
+  }
+
+  .record-title-row {
+    grid-template-columns: 1fr;
+  }
+
+  .record-title-row button {
+    min-height: 42px;
   }
 }
 

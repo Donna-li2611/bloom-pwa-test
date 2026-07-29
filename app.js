@@ -22,6 +22,10 @@
       review: '复盘',
       statistics: '统计',
       footprints: '足迹',
+      records: '记录',
+      allRecords: '全部',
+      readingRecords: '阅读',
+      workoutRecords: '运动',
       habits: '习惯',
       weeklyReview: '本周复盘',
       planAndActual: '计划与实际',
@@ -149,6 +153,10 @@
       review: 'Review',
       statistics: 'Stats',
       footprints: 'Footprints',
+      records: 'Journal',
+      allRecords: 'All',
+      readingRecords: 'Reading',
+      workoutRecords: 'Workout',
       habits: 'Habits',
       weeklyReview: 'Weekly review',
       planAndActual: 'Plan and actual',
@@ -301,8 +309,64 @@
     },
   ];
 
+  const createInitialRecords = () => {
+    const now = new Date();
+    const dateForOffset = (offset) => {
+      const date = new Date(now);
+      date.setDate(date.getDate() - offset);
+      return date.toISOString();
+    };
+    return [
+      {
+        id: 'sample-reading-1',
+        type: 'reading',
+        habitId: 'reading',
+        title: '推理小说里，秩序重新出现',
+        summary: '读到侦探把凌乱线索重新排成因果链，我忽然意识到，复盘也是一种温柔的整理。',
+        sourceText: '真正的答案并不总在最响亮的证词里，而在那些被忽略的小地方。',
+        images: ['./assets/icons/reading.png?v=2', './assets/icons/study.png?v=2'],
+        metrics: { minutes: 42, pages: 36 },
+        createdAt: dateForOffset(0),
+      },
+      {
+        id: 'sample-reading-2',
+        type: 'reading',
+        habitId: 'reading',
+        title: '关于自由，也关于承担',
+        summary: '选择并不会消除代价，但能让代价变得值得。',
+        sourceText: '自由不是没有约束，而是知道自己愿意为什么负责。',
+        images: ['./assets/icons/reading.png?v=2'],
+        metrics: { minutes: 28, pages: 21 },
+        createdAt: dateForOffset(3),
+      },
+      {
+        id: 'sample-workout-1',
+        type: 'workout',
+        habitId: 'workout',
+        title: '傍晚跑完，身体先替我放松了',
+        summary: '没有追配速，只保持舒服的呼吸。回家路上觉得头脑也一起变轻了。',
+        sourceText: '跑步 · 后半程节奏更稳定',
+        images: ['./assets/icons/workout.png?v=2', './assets/icons/walk.png?v=2'],
+        metrics: { minutes: 31, activityType: '跑步' },
+        createdAt: dateForOffset(1),
+      },
+      {
+        id: 'sample-workout-2',
+        type: 'workout',
+        habitId: 'workout',
+        title: '力量训练后的踏实感',
+        summary: '把动作做慢以后，反而更能感受到身体参与。今天没有加重量，但完成度更高。',
+        sourceText: '力量训练 · 深蹲、划船、肩推',
+        images: ['./assets/icons/workout.png?v=2'],
+        metrics: { minutes: 46, activityType: '力量训练' },
+        createdAt: dateForOffset(5),
+      },
+    ];
+  };
+
   const cloneInitialState = () => ({
     language: 'zh',
+    records: createInitialRecords(),
     habits: initialHabits.map((habit) => ({
       ...habit,
       weekStates: [...habit.weekStates],
@@ -319,6 +383,7 @@
           ...habit,
           recordOptions: habit.recordOptions || { text: false, photo: false, voice: false },
         }));
+        if (!Array.isArray(parsed.records)) parsed.records = createInitialRecords();
         return parsed;
       }
     } catch {}
@@ -330,6 +395,8 @@
   let selectedCheckinImageDataUrl = '';
   let aiRecognitionResults = new Map();
   let readingSession = null;
+  let pendingWorkoutSession = null;
+  let recordFilter = 'all';
   let selectedIcon = 'sprout';
   let selectedFrequency = 'daily';
   let reviewPeriod = 'week';
@@ -341,6 +408,7 @@
   const elements = {
     habitList: document.getElementById('habit-list'),
     managedHabitList: document.getElementById('managed-habit-list'),
+    recordSections: document.getElementById('record-sections'),
     weekMatrix: document.getElementById('week-matrix'),
     sleepChart: document.getElementById('sleep-chart'),
     weightChart: document.getElementById('weight-chart'),
@@ -594,6 +662,139 @@
     `;
   };
 
+  const escapeHtml = (value) => String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+
+  const recordDateParts = (createdAt) => {
+    const date = new Date(createdAt);
+    return {
+      month: `${date.getMonth() + 1}月`,
+      day: date.getDate(),
+      weekday: new Intl.DateTimeFormat(state.language === 'zh' ? 'zh-CN' : 'en-US', { weekday: 'short' }).format(date),
+      full: new Intl.DateTimeFormat(state.language === 'zh' ? 'zh-CN' : 'en-US', {
+        year: 'numeric', month: 'long', day: 'numeric', weekday: 'short',
+      }).format(date),
+    };
+  };
+
+  const recordMetricText = (record) => {
+    if (record.type === 'reading') {
+      return `${record.metrics?.minutes || 0} 分钟 · ${record.metrics?.pages || 0} 页`;
+    }
+    return `${record.metrics?.activityType || '运动'} · ${record.metrics?.minutes || 0} 分钟`;
+  };
+
+  const recordImagesMarkup = (record, detail = false) => {
+    const images = Array.isArray(record.images) ? record.images.filter(Boolean).slice(0, 9) : [];
+    if (!images.length) return '';
+    if (detail) {
+      return `
+        <div class="record-detail-images">
+          ${images.map((src, index) => `
+            <button type="button" data-record-image="${index}" aria-label="放大图片 ${index + 1}">
+              <img src="${escapeHtml(src)}" alt="记录图片 ${index + 1}">
+            </button>
+          `).join('')}
+        </div>
+      `;
+    }
+    return `
+      <span class="record-image-stack" aria-label="${images.length} 张图片">
+        ${images.slice(0, 3).map((src, index) => `<img src="${escapeHtml(src)}" alt="" style="--stack-index:${index}">`).join('')}
+        ${images.length > 3 ? `<b>+${images.length - 3}</b>` : ''}
+      </span>
+    `;
+  };
+
+  const recordEntryMarkup = (record) => {
+    const date = recordDateParts(record.createdAt);
+    const summary = record.summary || record.sourceText || '';
+    return `
+      <button class="record-entry" type="button" data-record-id="${escapeHtml(record.id)}">
+        <span class="record-entry-date"><small>${date.month}</small><strong>${date.day}</strong><small>${date.weekday}</small></span>
+        <span class="record-entry-copy">
+          <strong>${escapeHtml(record.title || (record.type === 'reading' ? '阅读记录' : '运动记录'))}</strong>
+          <span>${escapeHtml(summary)}</span>
+          <small><i class="record-type-dot is-${record.type}"></i>${record.type === 'reading' ? '阅读' : '运动'} · ${escapeHtml(recordMetricText(record))}</small>
+        </span>
+        ${recordImagesMarkup(record)}
+      </button>
+    `;
+  };
+
+  const renderRecords = () => {
+    document.querySelectorAll('[data-record-filter]').forEach((button) => {
+      const selected = button.dataset.recordFilter === recordFilter;
+      button.classList.toggle('is-selected', selected);
+      button.setAttribute('aria-pressed', String(selected));
+    });
+    const types = recordFilter === 'all' ? ['reading', 'workout'] : [recordFilter];
+    elements.recordSections.innerHTML = types.map((type) => {
+      const records = state.records
+        .filter((record) => record.type === type)
+        .sort((first, second) => new Date(second.createdAt) - new Date(first.createdAt));
+      const label = type === 'reading' ? t().readingRecords : t().workoutRecords;
+      const description = type === 'reading' ? '摘录、感悟与阅读现场' : '训练、身体感受与现场';
+      return `
+        <section class="record-section">
+          <header class="record-section-heading">
+            <div><h2>${label}</h2><p>${description}</p></div>
+            <span>${records.length} 篇</span>
+          </header>
+          <div class="record-list">
+            ${records.length ? records.map(recordEntryMarkup).join('') : `<p class="record-empty">${t().noData}</p>`}
+          </div>
+        </section>
+      `;
+    }).join('');
+  };
+
+  const showRecordLightbox = (src) => {
+    const lightbox = document.createElement('div');
+    lightbox.className = 'reading-lightbox';
+    lightbox.innerHTML = `
+      <button type="button" class="reading-lightbox-close" aria-label="关闭大图">×</button>
+      <img src="${escapeHtml(src)}" alt="放大的记录图片">
+    `;
+    lightbox.querySelector('button').addEventListener('click', () => lightbox.remove());
+    lightbox.addEventListener('click', (event) => {
+      if (event.target === lightbox) lightbox.remove();
+    });
+    elements.sheet.appendChild(lightbox);
+  };
+
+  const openRecordDetail = (recordId) => {
+    const record = state.records.find((item) => item.id === recordId);
+    if (!record) return;
+    const date = recordDateParts(record.createdAt);
+    activeHabitId = null;
+    readingSession = null;
+    pendingWorkoutSession = null;
+    document.getElementById('sheet-title').textContent = record.title || (record.type === 'reading' ? '阅读记录' : '运动记录');
+    const saveButton = document.querySelector('#checkin-form > .save-button');
+    saveButton.hidden = true;
+    elements.result.textContent = '';
+    elements.fields.innerHTML = `
+      <article class="record-detail">
+        <p class="record-detail-date">${escapeHtml(date.full)} · ${escapeHtml(recordMetricText(record))}</p>
+        ${recordImagesMarkup(record, true)}
+        ${record.summary ? `<section><h3>${record.type === 'reading' ? '我的感悟' : '身体感受'}</h3><p>${escapeHtml(record.summary)}</p></section>` : ''}
+        ${record.sourceText ? `<section><h3>${record.type === 'reading' ? '摘录原文' : '训练内容'}</h3><p class="record-detail-source">${escapeHtml(record.sourceText)}</p></section>` : ''}
+      </article>
+    `;
+    elements.fields.onclick = (event) => {
+      const imageButton = event.target.closest('[data-record-image]');
+      if (!imageButton) return;
+      const src = record.images?.[Number(imageButton.dataset.recordImage)];
+      if (src) showRecordLightbox(src);
+    };
+    openLayer(elements.sheet);
+  };
+
   const renderManagedHabits = () => {
     elements.managedHabitList.innerHTML = state.habits.map((habit) => `
       <article class="managed-habit ${habit.hidden ? 'is-hidden-habit' : ''}" data-managed-habit="${habit.id}">
@@ -655,6 +856,7 @@
     renderDate();
     renderToday();
     renderReview();
+    renderRecords();
     renderManagedHabits();
   };
 
@@ -671,6 +873,7 @@
     document.body.style.overflow = '';
     activeHabitId = null;
     readingSession = null;
+    pendingWorkoutSession = null;
   };
 
   const field = (label, input) => `<div class="field"><label>${label}</label>${input}</div>`;
@@ -1069,14 +1272,81 @@
     document.getElementById('reading-reflection-editor').value = readingSession.reflection;
   };
 
+  const fallbackRecordTitle = (type, sourceText, reflection, activityType = '') => {
+    const content = (reflection || sourceText || '').replace(/\s+/g, ' ').trim();
+    if (content) {
+      const firstSentence = content.split(/[。！？!?；;\n]/)[0].trim();
+      if (firstSentence) return firstSentence.slice(0, 22);
+    }
+    if (type === 'reading') return '今天的阅读片段';
+    return activityType ? `${activityType}后的记录` : '今天的运动记录';
+  };
+
+  const requestRecordTitle = async ({ type, sourceText, reflection, metrics, model }) => {
+    const token = localStorage.getItem(AI_TOKEN_STORAGE_KEY) || '';
+    if (!token) throw new Error('未连接 AI 服务');
+    const response = await fetch(`${AI_ENDPOINT}/api/record/title`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Bloom-Access-Token': token },
+      body: JSON.stringify({ type, sourceText, reflection, metrics, model }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+    return String(payload.title || '').trim();
+  };
+
+  const syncReadingTitle = () => {
+    const input = document.getElementById('reading-record-title');
+    if (input) readingSession.title = input.value.trim();
+  };
+
+  const runReadingTitle = async () => {
+    syncReadingTitle();
+    readingSession.titleLoading = true;
+    readingSession.titleStatus = 'AI 正在生成标题建议…';
+    renderReadingPreview(false);
+    try {
+      const title = await requestRecordTitle({
+        type: 'reading',
+        sourceText: readingSession.mergedSource || mergedReadingSource(),
+        reflection: readingSession.reflection,
+        metrics: `${readingSession.minutes} 分钟，${readingSession.pages} 页`,
+        model: readingSession.model,
+      });
+      if (title) readingSession.title = title;
+      readingSession.titleStatus = '已生成标题，你仍可以修改';
+    } catch {
+      readingSession.titleStatus = 'AI 暂时不可用，已保留可编辑标题，不影响保存';
+    } finally {
+      readingSession.titleLoading = false;
+      readingSession.titleRequested = true;
+      renderReadingPreview(false);
+    }
+  };
+
   const renderReadingPreview = (saved = false) => {
     const source = readingSession.mergedSource || mergedReadingSource();
+    if (!readingSession.title) {
+      readingSession.title = fallbackRecordTitle('reading', source, readingSession.reflection);
+    }
     elements.fields.innerHTML = `
       <div class="reading-flow">
         ${saved ? '<div class="reading-success">✓ 保存成功，可在“记录”中查看</div>' : readingStepNavigation()}
+        ${saved ? '' : `
+          <section class="record-title-panel">
+            <div class="reading-section-head">
+              <div><strong>记录标题</strong><small>保存前确认；可以自己写，也可以让 AI 建议</small></div>
+            </div>
+            <div class="record-title-row">
+              <input id="reading-record-title" maxlength="28" value="${escapeHtml(readingSession.title)}" aria-label="记录标题">
+              <button type="button" data-reading-action="ai-title" ${readingSession.titleLoading ? 'disabled' : ''}>${readingSession.titleLoading ? '生成中…' : 'AI 生成标题'}</button>
+            </div>
+            <p class="reading-helper">${escapeHtml(readingSession.titleStatus || '最终以你确认或修改后的标题保存。')}</p>
+          </section>
+        `}
         <section class="reading-panel">
           <div class="reading-section-head">
-            <div><strong>${saved ? '阅读记录' : '阅读记录预览'}</strong><small>${saved ? new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric' }).format(new Date()) : '三部分将作为同一条记录保存'}</small></div>
+            <div><strong>${saved ? escapeHtml(readingSession.title) : '阅读记录预览'}</strong><small>${saved ? new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric' }).format(new Date()) : '标题、图片、原文与感悟将作为同一条记录保存'}</small></div>
             <span>${saved ? '已保存' : '未保存'}</span>
           </div>
           <div class="reading-record-section">
@@ -1101,7 +1371,7 @@
         </section>
         ${saved
           ? ''
-          : '<div class="reading-bottom-actions"><button type="button" data-reading-action="go-reflection">返回修改</button><button class="reading-primary-button" type="button" data-reading-action="save">保存图片、原文与感悟</button></div>'}
+          : '<div class="reading-bottom-actions"><button type="button" data-reading-action="go-reflection">返回修改</button><button class="reading-primary-button" type="button" data-reading-action="save">确认标题并保存</button></div>'}
       </div>
     `;
     document.getElementById('reading-source-preview').textContent = source;
@@ -1203,6 +1473,13 @@
 
   const saveReadingRecord = () => {
     const habit = state.habits.find((item) => item.id === activeHabitId);
+    syncReadingTitle();
+    readingSession.title = readingSession.title || fallbackRecordTitle(
+      'reading',
+      readingSession.mergedSource || mergedReadingSource(),
+      readingSession.reflection,
+    );
+    const previousRecords = [...state.records];
     const previousHabit = {
       minutes: habit.minutes,
       pages: habit.pages,
@@ -1220,10 +1497,22 @@
     habit.latestReadingRecord = {
       id: `reading-${Date.now()}`,
       createdAt: new Date().toISOString(),
+      title: readingSession.title,
       images: readingSession.images.map((image) => image.dataUrl),
       sourceText: readingSession.mergedSource || mergedReadingSource(),
       reflection: readingSession.reflection,
     };
+    state.records.unshift({
+      id: habit.latestReadingRecord.id,
+      type: 'reading',
+      habitId: habit.id,
+      title: readingSession.title,
+      summary: readingSession.reflection,
+      sourceText: habit.latestReadingRecord.sourceText,
+      images: habit.latestReadingRecord.images,
+      metrics: { minutes: readingSession.minutes, pages: readingSession.pages },
+      createdAt: habit.latestReadingRecord.createdAt,
+    });
     if (!wasComplete && habit.complete) habit.weekDone = Math.min(habit.weekTarget, habit.weekDone + 1);
     if (wasComplete && !habit.complete) habit.weekDone = Math.max(0, habit.weekDone - 1);
     habit.weekStates[6] = habit.complete ? 'complete' : 'recorded';
@@ -1237,6 +1526,7 @@
       habit.weekDone = previousHabit.weekDone;
       habit.weekStates[6] = previousHabit.weekState;
       habit.latestReadingRecord = previousHabit.latestReadingRecord;
+      state.records = previousRecords;
       readingSession.status = '图片较多，当前设备存储空间不足，请减少图片后重试';
       renderReadingPreview(false);
       return;
@@ -1260,13 +1550,6 @@
     habit.pages = readingSession.pages;
     habit.recorded = true;
     habit.complete = habit.minutes >= habit.target;
-    habit.latestReadingRecord = {
-      id: `reading-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      images: [],
-      sourceText: '',
-      reflection: '',
-    };
     if (!wasComplete && habit.complete) habit.weekDone = Math.min(habit.weekTarget, habit.weekDone + 1);
     if (wasComplete && !habit.complete) habit.weekDone = Math.max(0, habit.weekDone - 1);
     habit.weekStates[6] = habit.complete ? 'complete' : 'recorded';
@@ -1280,6 +1563,7 @@
     elements.fields.onclick = (event) => {
       const action = event.target.closest('[data-reading-action]');
       if (!action) return;
+      syncReadingTitle();
       const type = action.dataset.readingAction;
       if (type === 'expand-reading') {
         syncReadingMetrics();
@@ -1324,7 +1608,11 @@
         readingSession.reflection = document.getElementById('reading-reflection-editor').value;
         readingSession.step = 'preview';
         renderReadingStep();
+        if (!readingSession.titleRequested && localStorage.getItem(AI_TOKEN_STORAGE_KEY)) {
+          runReadingTitle();
+        }
       }
+      if (type === 'ai-title') runReadingTitle();
       if (type === 'save') saveReadingRecord();
       if (type === 'step') {
         const target = action.dataset.step;
@@ -1341,6 +1629,9 @@
         }
         readingSession.step = target;
         renderReadingStep();
+        if (target === 'preview' && !readingSession.titleRequested && localStorage.getItem(AI_TOKEN_STORAGE_KEY)) {
+          runReadingTitle();
+        }
       }
     };
     elements.fields.onchange = async (event) => {
@@ -1369,7 +1660,10 @@
     activeHabitId = habitId;
     elements.fields.onclick = null;
     elements.fields.onchange = null;
-    document.querySelector('#checkin-form > .save-button').hidden = false;
+    const formSaveButton = document.querySelector('#checkin-form > .save-button');
+    formSaveButton.hidden = false;
+    formSaveButton.textContent = t().saveRecord;
+    pendingWorkoutSession = null;
     selectedCheckinImageDataUrl = '';
     aiRecognitionResults = new Map();
     document.getElementById('sheet-title').textContent = habitName(habit);
@@ -1409,6 +1703,10 @@
         activeSourceId: '',
         mergedSource: '',
         reflection: '',
+        title: '',
+        titleStatus: '',
+        titleLoading: false,
+        titleRequested: false,
         minutes: habit.minutes,
         pages: habit.pages,
         model: 'qwen3.7-plus',
@@ -1452,8 +1750,125 @@
     setupOptionalInputs(habit);
   };
 
+  const renderWorkoutTitleConfirmation = (habit) => {
+    const session = pendingWorkoutSession;
+    document.getElementById('sheet-title').textContent = habitName(habit);
+    elements.fields.innerHTML = `
+      <div class="workout-record-preview">
+        <section class="record-title-panel">
+          <div class="reading-section-head">
+            <div><strong>记录标题</strong><small>保存前确认；可以自己写，也可以让 AI 建议</small></div>
+          </div>
+          <div class="record-title-row">
+            <input id="workout-record-title" maxlength="28" value="${escapeHtml(session.title)}" aria-label="记录标题">
+            <button id="workout-ai-title" type="button" ${session.titleLoading ? 'disabled' : ''}>${session.titleLoading ? '生成中…' : 'AI 生成标题'}</button>
+          </div>
+          <p class="reading-helper">${escapeHtml(session.titleStatus || '最终以你确认或修改后的标题保存。')}</p>
+        </section>
+        <section class="reading-panel">
+          <div class="reading-section-head">
+            <div><strong>运动记录预览</strong><small>${escapeHtml(session.activityType)} · ${session.minutes} 分钟</small></div>
+            <span>未保存</span>
+          </div>
+          ${session.image ? `<div class="record-detail-images"><button type="button" id="workout-preview-image"><img src="${escapeHtml(session.image)}" alt="运动记录图片"></button></div>` : ''}
+          <div class="reading-record-section">
+            <strong>身体感受</strong>
+            <p>${escapeHtml(session.note || '尚未填写文字')}</p>
+          </div>
+        </section>
+      </div>
+    `;
+    const saveButton = document.querySelector('#checkin-form > .save-button');
+    saveButton.textContent = '确认标题并保存';
+    document.getElementById('workout-record-title').addEventListener('input', (event) => {
+      session.title = event.target.value;
+    });
+    document.getElementById('workout-ai-title').addEventListener('click', async () => {
+      session.title = document.getElementById('workout-record-title').value.trim();
+      session.titleLoading = true;
+      session.titleStatus = 'AI 正在生成标题建议…';
+      renderWorkoutTitleConfirmation(habit);
+      try {
+        const title = await requestRecordTitle({
+          type: 'workout',
+          sourceText: session.activityType,
+          reflection: session.note,
+          metrics: `${session.activityType}，${session.minutes} 分钟`,
+          model: 'qwen3.7-plus',
+        });
+        if (title) session.title = title;
+        session.titleStatus = '已生成标题，你仍可以修改';
+      } catch {
+        session.titleStatus = 'AI 暂时不可用，已保留可编辑标题，不影响保存';
+      } finally {
+        session.titleLoading = false;
+        renderWorkoutTitleConfirmation(habit);
+      }
+    });
+    document.getElementById('workout-preview-image')?.addEventListener('click', () => showRecordLightbox(session.image));
+  };
+
+  const commitWorkoutCheckin = (habit) => {
+    const session = pendingWorkoutSession;
+    session.title = document.getElementById('workout-record-title')?.value.trim() || session.title;
+    session.title = session.title || fallbackRecordTitle('workout', session.activityType, session.note, session.activityType);
+    const wasComplete = habit.complete;
+    const previousRecords = [...state.records];
+    const previousHabit = {
+      minutes: habit.minutes,
+      actual: habit.actual,
+      recorded: habit.recorded,
+      complete: habit.complete,
+      weekDone: habit.weekDone,
+      weekState: habit.weekStates[6],
+      note: habit.note,
+    };
+    habit.minutes += session.minutes;
+    habit.actual += habit.recorded ? 0 : 1;
+    habit.recorded = true;
+    habit.complete = session.minutes >= 30;
+    habit.note = session.note;
+    if (!wasComplete && habit.complete) habit.weekDone = Math.min(habit.weekTarget, habit.weekDone + 1);
+    if (wasComplete && !habit.complete) habit.weekDone = Math.max(0, habit.weekDone - 1);
+    habit.weekStates[6] = habit.complete ? 'complete' : 'recorded';
+    state.records.unshift({
+      id: `workout-${Date.now()}`,
+      type: 'workout',
+      habitId: habit.id,
+      title: session.title,
+      summary: session.note,
+      sourceText: session.activityType,
+      images: session.image ? [session.image] : [],
+      metrics: { minutes: session.minutes, activityType: session.activityType },
+      createdAt: new Date().toISOString(),
+    });
+    try {
+      persist();
+    } catch {
+      Object.assign(habit, {
+        minutes: previousHabit.minutes,
+        actual: previousHabit.actual,
+        recorded: previousHabit.recorded,
+        complete: previousHabit.complete,
+        weekDone: previousHabit.weekDone,
+        note: previousHabit.note,
+      });
+      habit.weekStates[6] = previousHabit.weekState;
+      state.records = previousRecords;
+      elements.result.textContent = '当前设备存储空间不足，请减少图片后重试';
+      return;
+    }
+    closeLayers();
+    renderAll();
+    showToast('保存成功，可在“记录”中查看');
+  };
+
   const saveCheckin = () => {
     const habit = state.habits.find((item) => item.id === activeHabitId);
+    if (habit?.kind === 'workout' && pendingWorkoutSession) {
+      commitWorkoutCheckin(habit);
+      return;
+    }
     const wasComplete = habit.complete;
 
     if (habit.kind === 'time') {
@@ -1462,6 +1877,21 @@
       habit.complete = habit.id === 'sleep' ? habit.actual <= habit.target : habit.actual <= habit.target;
     } else if (habit.kind === 'workout') {
       const minutes = Number(document.getElementById('workout-minutes').value);
+      const activityType = document.getElementById('activity-type').value;
+      const note = document.getElementById('record-note')?.value.trim() || '';
+      if (note || selectedCheckinImageDataUrl) {
+        pendingWorkoutSession = {
+          minutes,
+          activityType,
+          note,
+          image: selectedCheckinImageDataUrl,
+          title: fallbackRecordTitle('workout', activityType, note, activityType),
+          titleStatus: '',
+          titleLoading: false,
+        };
+        renderWorkoutTitleConfirmation(habit);
+        return;
+      }
       habit.minutes += minutes;
       habit.actual += habit.recorded ? 0 : 1;
       habit.recorded = true;
@@ -1679,6 +2109,18 @@
       document.querySelectorAll('.page').forEach((page) => page.classList.toggle('is-active', page.id === button.dataset.page));
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
+  });
+
+  document.getElementById('record-filters').addEventListener('click', (event) => {
+    const button = event.target.closest('[data-record-filter]');
+    if (!button) return;
+    recordFilter = button.dataset.recordFilter;
+    renderRecords();
+  });
+
+  elements.recordSections.addEventListener('click', (event) => {
+    const entry = event.target.closest('[data-record-id]');
+    if (entry) openRecordDetail(entry.dataset.recordId);
   });
 
   elements.habitList.addEventListener('click', (event) => {

@@ -13,7 +13,7 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="apple-touch-icon" href="./assets/pwa/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="./assets/pwa/bloom-icon-192.png">
-  <link rel="stylesheet" href="./styles.css?v=11">
+  <link rel="stylesheet" href="./styles.css?v=12">
 </head>
 <body>
   <main class="app-shell">
@@ -100,6 +100,21 @@
       </section>
     </section>
 
+    <section class="page" id="records-page" aria-labelledby="records-title">
+      <header class="records-hero">
+        <div>
+          <p class="date-label">Bloom</p>
+          <h1 id="records-title" data-i18n="records">记录</h1>
+        </div>
+        <div class="record-filters" id="record-filters" aria-label="记录分类">
+          <button class="record-filter is-selected" type="button" data-record-filter="all" aria-pressed="true" data-i18n="allRecords">全部</button>
+          <button class="record-filter" type="button" data-record-filter="reading" aria-pressed="false" data-i18n="readingRecords">阅读</button>
+          <button class="record-filter" type="button" data-record-filter="workout" aria-pressed="false" data-i18n="workoutRecords">运动</button>
+        </div>
+      </header>
+      <div class="record-sections" id="record-sections"></div>
+    </section>
+
     <section class="page" id="habits-page" aria-labelledby="habits-title">
       <header class="habits-hero">
         <p class="date-label" data-i18n="manageHabits">管理习惯</p>
@@ -120,6 +135,10 @@
       <button class="nav-button" type="button" data-page="review-page">
         <span class="nav-icon" aria-hidden="true">◔</span>
         <span data-i18n="statistics">统计</span>
+      </button>
+      <button class="nav-button" type="button" data-page="records-page">
+        <span class="nav-icon" aria-hidden="true">▤</span>
+        <span data-i18n="records">记录</span>
       </button>
       <button class="nav-button" type="button" data-page="habits-page">
         <span class="nav-icon" aria-hidden="true">✦</span>
@@ -264,6 +283,6 @@
   </section>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="./app.js?v=11"></script>
+  <script src="./app.js?v=12"></script>
 </body>
 </html>
