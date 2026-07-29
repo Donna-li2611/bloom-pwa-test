@@ -596,7 +596,7 @@
 
   const renderManagedHabits = () => {
     elements.managedHabitList.innerHTML = state.habits.map((habit) => `
-      <article class="managed-habit ${habit.hidden ? 'is-hidden-habit' : ''}" data-managed-habit="${habit.id}" draggable="true">
+      <article class="managed-habit ${habit.hidden ? 'is-hidden-habit' : ''}" data-managed-habit="${habit.id}">
         <button class="drag-handle" type="button" aria-label="${t().dragHint}" data-drag-handle="${habit.id}">≡</button>
         <span class="habit-icon">${iconMarkup(habit.icon)}</span>
         <div>
@@ -997,6 +997,21 @@
     `;
   };
 
+  const renderReadingChoice = () => {
+    elements.fields.innerHTML = `
+      <div class="reading-entry">
+        <div class="field-pair">
+          ${field(t().minutes, `<input id="reading-minutes" type="number" min="0" value="${readingSession.minutes}" required>`)}
+          ${field(t().pages, `<input id="reading-pages" type="number" min="0" value="${readingSession.pages}" required>`)}
+        </div>
+        <div class="reading-entry-actions">
+          <button type="button" data-reading-action="expand-reading">添加图片和感悟</button>
+          <button class="reading-primary-button" type="button" data-reading-action="direct-save">直接保存</button>
+        </div>
+      </div>
+    `;
+  };
+
   const renderReadingSource = () => {
     if (
       !readingSession.activeSourceId
@@ -1096,7 +1111,8 @@
   const renderReadingStep = () => {
     const saveButton = document.querySelector('#checkin-form > .save-button');
     saveButton.hidden = true;
-    if (readingSession.step === 'photos') renderReadingPhotos();
+    if (readingSession.step === 'choice') renderReadingChoice();
+    else if (readingSession.step === 'photos') renderReadingPhotos();
     else if (readingSession.step === 'source') renderReadingSource();
     else if (readingSession.step === 'reflection') renderReadingReflection();
     else renderReadingPreview(readingSession.step === 'saved');
@@ -1230,11 +1246,50 @@
     renderReadingStep();
   };
 
+  const syncReadingMetrics = () => {
+    const minutes = document.getElementById('reading-minutes');
+    const pages = document.getElementById('reading-pages');
+    if (minutes) readingSession.minutes = Number(minutes.value);
+    if (pages) readingSession.pages = Number(pages.value);
+  };
+
+  const saveReadingDirect = () => {
+    const habit = state.habits.find((item) => item.id === activeHabitId);
+    const wasComplete = habit.complete;
+    habit.minutes = readingSession.minutes;
+    habit.pages = readingSession.pages;
+    habit.recorded = true;
+    habit.complete = habit.minutes >= habit.target;
+    habit.latestReadingRecord = {
+      id: `reading-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      images: [],
+      sourceText: '',
+      reflection: '',
+    };
+    if (!wasComplete && habit.complete) habit.weekDone = Math.min(habit.weekTarget, habit.weekDone + 1);
+    if (wasComplete && !habit.complete) habit.weekDone = Math.max(0, habit.weekDone - 1);
+    habit.weekStates[6] = habit.complete ? 'complete' : 'recorded';
+    persist();
+    closeLayers();
+    renderAll();
+    showToast('阅读记录已保存');
+  };
+
   const setupReadingFlow = () => {
     elements.fields.onclick = (event) => {
       const action = event.target.closest('[data-reading-action]');
       if (!action) return;
       const type = action.dataset.readingAction;
+      if (type === 'expand-reading') {
+        syncReadingMetrics();
+        readingSession.step = 'photos';
+        renderReadingStep();
+      }
+      if (type === 'direct-save') {
+        syncReadingMetrics();
+        saveReadingDirect();
+      }
       if (type === 'enlarge') renderReadingLightbox(action.dataset.imageId);
       if (type === 'remove-image') {
         readingSession.images = readingSession.images.filter((image) => image.id !== action.dataset.imageId);
@@ -1348,7 +1403,7 @@
       `;
     } else if (habit.kind === 'reading') {
       readingSession = {
-        step: 'photos',
+        step: 'choice',
         images: [],
         ocrByImage: new Map(),
         activeSourceId: '',
@@ -1747,66 +1802,98 @@
     }
   });
 
-  elements.managedHabitList.addEventListener('dragstart', (event) => {
-    const card = event.target.closest('[data-managed-habit]');
-    if (!card) return;
-    draggedHabitId = card.dataset.managedHabit;
-    card.classList.add('is-dragging');
-    event.dataTransfer.effectAllowed = 'move';
-  });
+  let pointerDragState = null;
+  const animateHabitShift = (beforeRects) => {
+    requestAnimationFrame(() => {
+      elements.managedHabitList.querySelectorAll('.managed-habit:not(.is-pointer-dragging)').forEach((card) => {
+        const before = beforeRects.get(card.dataset.managedHabit);
+        if (!before) return;
+        const deltaY = before.top - card.getBoundingClientRect().top;
+        if (Math.abs(deltaY) < 1 || !card.animate) return;
+        card.animate(
+          [{ transform: `translateY(${deltaY}px)` }, { transform: 'translateY(0)' }],
+          { duration: 190, easing: 'cubic-bezier(.2,.8,.2,1)' },
+        );
+      });
+    });
+  };
 
-  elements.managedHabitList.addEventListener('dragover', (event) => {
-    const card = event.target.closest('[data-managed-habit]');
-    if (!card || card.dataset.managedHabit === draggedHabitId) return;
-    event.preventDefault();
-    elements.managedHabitList.querySelectorAll('.is-drag-over').forEach((item) => item.classList.remove('is-drag-over'));
-    card.classList.add('is-drag-over');
-  });
-
-  elements.managedHabitList.addEventListener('drop', (event) => {
-    event.preventDefault();
-    const card = event.target.closest('[data-managed-habit]');
-    const targetId = card?.dataset.managedHabit;
-    const sourceId = draggedHabitId;
+  const finishPointerHabitDrag = (saveOrder) => {
+    if (!pointerDragState) return;
+    const { card, placeholder } = pointerDragState;
+    card.classList.remove('is-pointer-dragging');
+    card.removeAttribute('style');
+    if (saveOrder) {
+      placeholder.replaceWith(card);
+      const order = [...elements.managedHabitList.querySelectorAll('[data-managed-habit]')]
+        .map((item) => item.dataset.managedHabit);
+      const habitsById = new Map(state.habits.map((habit) => [habit.id, habit]));
+      state.habits = order.map((id) => habitsById.get(id)).filter(Boolean);
+      persist();
+      renderAll();
+      showToast(state.language === 'zh' ? '顺序已更新' : 'Order updated');
+    } else {
+      renderManagedHabits();
+    }
     draggedHabitId = null;
-    clearDragStyles();
-    reorderHabits(sourceId, targetId);
-  });
+    pointerDragState = null;
+  };
 
-  elements.managedHabitList.addEventListener('dragend', () => {
-    draggedHabitId = null;
-    clearDragStyles();
-  });
-
-  let pointerTargetId = null;
   elements.managedHabitList.addEventListener('pointerdown', (event) => {
     const handle = event.target.closest('[data-drag-handle]');
-    if (!handle) return;
+    if (!handle || pointerDragState || event.button !== 0) return;
+    event.preventDefault();
+    const card = handle.closest('.managed-habit');
+    const rect = card.getBoundingClientRect();
+    const placeholder = document.createElement('div');
+    placeholder.className = 'managed-habit-placeholder';
+    placeholder.style.height = `${rect.height}px`;
+    card.before(placeholder);
     draggedHabitId = handle.dataset.dragHandle;
-    pointerTargetId = draggedHabitId;
     handle.setPointerCapture(event.pointerId);
-    handle.closest('.managed-habit')?.classList.add('is-dragging');
+    card.classList.add('is-pointer-dragging');
+    Object.assign(card.style, {
+      position: 'fixed',
+      zIndex: '40',
+      top: `${rect.top}px`,
+      left: `${rect.left}px`,
+      width: `${rect.width}px`,
+      margin: '0',
+    });
+    pointerDragState = {
+      card,
+      placeholder,
+      pointerId: event.pointerId,
+      grabOffsetY: event.clientY - rect.top,
+    };
   });
 
   elements.managedHabitList.addEventListener('pointermove', (event) => {
-    if (!draggedHabitId) return;
+    if (!pointerDragState || event.pointerId !== pointerDragState.pointerId) return;
     event.preventDefault();
-    const card = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-managed-habit]');
-    if (!card || card.dataset.managedHabit === draggedHabitId) return;
-    pointerTargetId = card.dataset.managedHabit;
-    elements.managedHabitList.querySelectorAll('.is-drag-over').forEach((item) => item.classList.remove('is-drag-over'));
-    card.classList.add('is-drag-over');
+    const { card, placeholder, grabOffsetY } = pointerDragState;
+    card.style.top = `${event.clientY - grabOffsetY}px`;
+    const candidates = [...elements.managedHabitList.querySelectorAll('.managed-habit:not(.is-pointer-dragging)')];
+    const beforeRects = new Map(candidates.map((item) => [item.dataset.managedHabit, item.getBoundingClientRect()]));
+    const nextCard = candidates.find((item) => event.clientY < item.getBoundingClientRect().top + item.offsetHeight / 2);
+    const currentNext = placeholder.nextElementSibling === card
+      ? card.nextElementSibling
+      : placeholder.nextElementSibling;
+    if (nextCard !== currentNext) {
+      if (nextCard) elements.managedHabitList.insertBefore(placeholder, nextCard);
+      else elements.managedHabitList.appendChild(placeholder);
+      animateHabitShift(beforeRects);
+    }
+    if (event.clientY < 90) window.scrollBy({ top: -8, behavior: 'auto' });
+    if (event.clientY > window.innerHeight - 90) window.scrollBy({ top: 8, behavior: 'auto' });
   });
 
   elements.managedHabitList.addEventListener('pointerup', (event) => {
-    if (!draggedHabitId) return;
-    const sourceId = draggedHabitId;
-    const targetId = pointerTargetId;
-    draggedHabitId = null;
-    pointerTargetId = null;
-    clearDragStyles();
-    reorderHabits(sourceId, targetId);
+    if (!pointerDragState || event.pointerId !== pointerDragState.pointerId) return;
+    finishPointerHabitDrag(true);
   });
+
+  elements.managedHabitList.addEventListener('pointercancel', () => finishPointerHabitDrag(false));
 
   document.getElementById('period-tabs').addEventListener('click', (event) => {
     const button = event.target.closest('[data-period]');

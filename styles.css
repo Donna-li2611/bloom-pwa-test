@@ -646,6 +646,7 @@ h2 {
   align-items: center;
   padding: 15px;
   border-bottom: 1px solid var(--line);
+  background: var(--surface);
 }
 
 .managed-habit.is-hidden-habit {
@@ -659,12 +660,20 @@ h2 {
   filter: grayscale(0.75);
 }
 
-.managed-habit.is-dragging {
-  opacity: 0.46;
+.managed-habit.is-pointer-dragging {
+  pointer-events: none;
+  border: 1px solid rgba(108, 139, 76, 0.28);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 18px 40px rgba(47, 52, 36, 0.2);
+  transform: scale(1.025) rotate(0.35deg);
 }
 
-.managed-habit.is-drag-over {
-  background: var(--sun-soft);
+.managed-habit-placeholder {
+  margin: 4px 0;
+  border: 2px dashed rgba(108, 139, 76, 0.3);
+  border-radius: 18px;
+  background: rgba(108, 139, 76, 0.08);
 }
 
 .drag-handle {
@@ -1358,6 +1367,34 @@ h2 {
 .reading-flow {
   display: grid;
   gap: 14px;
+}
+
+.reading-entry {
+  display: grid;
+  gap: 20px;
+}
+
+.reading-entry-actions {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: 10px;
+}
+
+.reading-entry-actions button {
+  min-height: 54px;
+  padding: 11px 12px;
+  border-radius: 16px;
+  font-weight: 800;
+}
+
+.reading-entry-actions > button:first-child {
+  border: 1px solid rgba(108, 139, 76, 0.34);
+  color: var(--green);
+  background: var(--surface);
+}
+
+.reading-entry-actions .reading-primary-button {
+  margin: 0;
 }
 
 .reading-steps {
