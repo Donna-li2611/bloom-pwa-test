@@ -1,9 +1,9 @@
-const CACHE_NAME = 'bloom-pwa-v13';
+const CACHE_NAME = 'bloom-pwa-v14';
 const APP_SHELL = [
   './',
   './index.html',
-  './styles.css?v=13',
-  './app.js?v=13',
+  './styles.css?v=14',
+  './app.js?v=14',
   './manifest.webmanifest',
   './assets/pwa/bloom-icon-192.png',
   './assets/pwa/bloom-icon-512.png',

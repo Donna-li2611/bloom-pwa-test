@@ -1461,18 +1461,27 @@
       return;
     }
     readingSession.loading = true;
-    readingSession.status = 'AI 正在生成感悟初稿…';
+    readingSession.status = `AI 正在阅读完整合并原文（${completeSource.length} 字）…`;
     renderReadingReflection();
     try {
+      const completeSourceForAi = [
+        '【Bloom 生成要求】',
+        '下面是用户逐张校对、修改并最终合并确认的完整原文，不是单张图片的内容。',
+        '请完整阅读全部原文，生成感悟时必须综合至少两个不同部分；同时关注前半段和后半段，不能只围绕开头或某一个片段。',
+        '不要把这段生成要求写进感悟。',
+        '【完整合并原文开始】',
+        completeSource,
+        '【完整合并原文结束】',
+      ].join('\n');
       const response = await fetch(`${AI_ENDPOINT}/api/reading/reflection`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Bloom-Access-Token': token },
-        body: JSON.stringify({ model: readingSession.model, sourceText: completeSource }),
+        body: JSON.stringify({ model: readingSession.model, sourceText: completeSourceForAi }),
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
       readingSession.reflection = payload.reflection || '';
-      readingSession.status = '';
+      readingSession.status = `已基于完整合并原文（${completeSource.length} 字）生成，可继续修改`;
     } catch (error) {
       readingSession.status = `生成失败：${error.message}`;
     } finally {
