@@ -469,6 +469,18 @@ h2 {
   stroke-width: 2.5;
 }
 
+.chart-point.is-on-target,
+.chart-point-wake.is-on-target {
+  fill: var(--green-soft);
+  stroke: var(--green);
+}
+
+.chart-point.is-missed,
+.chart-point-wake.is-missed {
+  fill: var(--sun-soft);
+  stroke: var(--sun);
+}
+
 .chart-label {
   fill: var(--text-muted);
   font-size: 9px;
@@ -478,6 +490,11 @@ h2 {
   fill: var(--text-muted);
   font-size: 8px;
   font-variant-numeric: tabular-nums;
+}
+
+.chart-axis-label.is-plan-label {
+  fill: var(--text);
+  font-weight: 750;
 }
 
 .chart-value-label {
@@ -549,7 +566,7 @@ h2 {
 }
 
 .matrix-scroll {
-  overflow-x: auto;
+  overflow-x: hidden;
   border: 1px solid var(--line);
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.9);
@@ -558,27 +575,43 @@ h2 {
 
 .week-matrix {
   width: 100%;
-  min-width: 520px;
+  min-width: 0;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 13px;
 }
 
 .week-matrix th,
 .week-matrix td {
-  min-width: 42px;
-  padding: 11px 7px;
+  min-width: 0;
+  padding: 11px 2px;
   border-bottom: 1px solid var(--line);
   text-align: center;
 }
 
 .week-matrix th:first-child,
 .week-matrix td:first-child {
+  width: 94px;
+  min-width: 94px;
+  background: var(--surface);
+  text-align: left;
+}
+
+.matrix-scroll.is-year-period {
+  overflow-x: auto;
+}
+
+.matrix-scroll.is-year-period .week-matrix {
+  width: 660px;
+  min-width: 660px;
+  table-layout: fixed;
+}
+
+.matrix-scroll.is-year-period .week-matrix th:first-child,
+.matrix-scroll.is-year-period .week-matrix td:first-child {
   position: sticky;
   left: 0;
   z-index: 1;
-  min-width: 112px;
-  background: var(--surface);
-  text-align: left;
 }
 
 .week-matrix tr:last-child td {

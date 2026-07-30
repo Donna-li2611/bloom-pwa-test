@@ -675,6 +675,9 @@
     document.getElementById('suggestion-title').textContent = t().suggestion;
     renderPeriodHeader();
     const columns = buckets.map((bucket) => bucket.label);
+    const matrixScroll = elements.weekMatrix.closest('.matrix-scroll');
+    matrixScroll?.classList.toggle('is-year-period', reviewPeriod === 'year');
+    elements.weekMatrix.dataset.period = reviewPeriod;
     elements.weekMatrix.innerHTML = `
       <thead><tr><th>${t().habits}</th>${columns.map((column) => `<th>${column}</th>`).join('')}</tr></thead>
       <tbody>${state.habits.map((habit) => `
@@ -746,11 +749,11 @@
     }
     if (reviewPeriod === 'month') {
       const buckets = [];
-      for (let day = 1; day <= end.getDate(); day += 7) {
+      for (let day = 1; day <= end.getDate(); day += 6) {
         const bucketStart = new Date(start.getFullYear(), start.getMonth(), day, 12);
-        const bucketEnd = new Date(start.getFullYear(), start.getMonth(), Math.min(day + 6, end.getDate()), 12);
+        const bucketEnd = new Date(start.getFullYear(), start.getMonth(), Math.min(day + 5, end.getDate()), 12);
         buckets.push({
-          label: `${day}–${bucketEnd.getDate()}`,
+          label: day === bucketEnd.getDate() ? String(day) : `${day}–${bucketEnd.getDate()}`,
           dateKeys: datesBetween(bucketStart, bucketEnd),
         });
       }
@@ -833,26 +836,24 @@
     const wakePlanY = wakeY(7 * 60);
     const bedPoints = bedValues.map((value, index) => Number.isFinite(value) ? `${x(index)},${bedY(value)}` : '').filter(Boolean).join(' ');
     const wakePoints = wakeValues.map((value, index) => Number.isFinite(value) ? `${x(index)},${wakeY(value)}` : '').filter(Boolean).join(' ');
+    const weeklyPointClass = (bucket, habitId) => {
+      if (reviewPeriod !== 'week') return '';
+      return historyStatus(bucket.dateKeys[0], habitId) === 'complete' ? 'is-on-target' : 'is-missed';
+    };
     elements.sleepChart.setAttribute('aria-label', `${t().actualBedtime}, ${t().actualWake}`);
     elements.sleepChart.innerHTML = `
-      ${[['23:00', 23 * 60], ['23:30', 23.5 * 60], ['00:00', 24 * 60]].map(([label, value]) => `
-        <line class="chart-grid" x1="54" y1="${bedY(value)}" x2="340" y2="${bedY(value)}"></line>
-        <text class="chart-axis-label" x="49" y="${bedY(value) + 3}" text-anchor="end">${label}</text>
-      `).join('')}
-      ${[['06:30', 6.5 * 60], ['07:00', 7 * 60], ['07:30', 7.5 * 60]].map(([label, value]) => `
-        <line class="chart-grid" x1="54" y1="${wakeY(value)}" x2="340" y2="${wakeY(value)}"></line>
-        <text class="chart-axis-label" x="49" y="${wakeY(value) + 3}" text-anchor="end">${label}</text>
-      `).join('')}
       <line class="chart-plan" x1="54" y1="${bedPlanY}" x2="340" y2="${bedPlanY}"></line>
+      <text class="chart-axis-label is-plan-label" x="49" y="${bedPlanY + 3}" text-anchor="end">23:30</text>
       <line class="chart-plan" x1="54" y1="${wakePlanY}" x2="340" y2="${wakePlanY}"></line>
+      <text class="chart-axis-label is-plan-label" x="49" y="${wakePlanY + 3}" text-anchor="end">07:00</text>
       <polyline class="chart-line" points="${bedPoints}"></polyline>
       <polyline class="chart-line-wake" points="${wakePoints}"></polyline>
       ${bedValues.map((value, index) => Number.isFinite(value) ? `
-        <circle class="chart-point" cx="${x(index)}" cy="${bedY(value)}" r="4"></circle>
+        <circle class="chart-point ${weeklyPointClass(buckets[index], 'sleep')}" cx="${x(index)}" cy="${bedY(value)}" r="4"></circle>
         <text class="chart-value-label" x="${x(index)}" y="${bedY(value) - 7}" text-anchor="middle">${formatTimeMinutes(value)}</text>
       ` : '').join('')}
       ${wakeValues.map((value, index) => Number.isFinite(value) ? `
-        <circle class="chart-point-wake" cx="${x(index)}" cy="${wakeY(value)}" r="4"></circle>
+        <circle class="chart-point-wake ${weeklyPointClass(buckets[index], 'wake')}" cx="${x(index)}" cy="${wakeY(value)}" r="4"></circle>
         <text class="chart-value-label" x="${x(index)}" y="${wakeY(value) - 7}" text-anchor="middle">${formatTimeMinutes(value)}</text>
       ` : '').join('')}
       ${buckets.map((bucket, index) => `<text class="chart-label" x="${x(index)}" y="166" text-anchor="middle">${bucket.label}</text>`).join('')}
@@ -870,15 +871,10 @@
     const chartValues = numericValues.length ? numericValues : [70.5, 70.8];
     const min = Math.min(...chartValues) - 0.15;
     const max = Math.max(...chartValues) + 0.15;
-    const mid = (min + max) / 2;
     const x = (index) => chartX(index, buckets.length);
     const y = (value) => 20 + (max - value) / Math.max(0.1, max - min) * 108;
     elements.weightChart.setAttribute('aria-label', t().weightTrend);
     elements.weightChart.innerHTML = `
-      ${[[max, 20], [mid, 74], [min, 128]].map(([value, yPosition]) => `
-        <line class="chart-grid" x1="54" y1="${yPosition}" x2="340" y2="${yPosition}"></line>
-        <text class="chart-axis-label" x="49" y="${yPosition + 3}" text-anchor="end">${value.toFixed(1)}</text>
-      `).join('')}
       <polyline class="chart-line" points="${values.map((value, index) => Number.isFinite(value) ? `${x(index)},${y(value)}` : '').filter(Boolean).join(' ')}"></polyline>
       ${values.map((value, index) => Number.isFinite(value) ? `
         <circle class="chart-point" cx="${x(index)}" cy="${y(value)}" r="4"></circle>
