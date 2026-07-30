@@ -13,7 +13,7 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="apple-touch-icon" href="./assets/pwa/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="./assets/pwa/bloom-icon-192.png">
-  <link rel="stylesheet" href="./styles.css?v=18">
+  <link rel="stylesheet" href="./styles.css?v=19">
 </head>
 <body>
   <main class="app-shell">
@@ -226,7 +226,7 @@
             <label for="habit-target" data-i18n="target">计划</label>
             <input id="habit-target" type="number" min="1" value="30">
           </div>
-          <div class="field">
+          <div class="field" id="habit-unit-field">
             <label for="habit-unit" data-i18n="unit">单位</label>
             <select id="habit-unit">
               <option value="分钟">分钟</option>
@@ -278,6 +278,6 @@
   </section>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="./app.js?v=18"></script>
+  <script src="./app.js?v=19"></script>
 </body>
 </html>

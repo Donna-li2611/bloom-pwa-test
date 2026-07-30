@@ -538,7 +538,10 @@
     if (habit.kind === 'weight') entry.value = habit.value;
     state.history[date][habit.id] = entry;
   };
-  const ratio = (habit) => Math.min(1, habit.weekDone / Math.max(1, habit.weekTarget));
+  const ratio = (habit) => {
+    const progress = currentWeekProgress(habit);
+    return Math.min(1, progress.complete / Math.max(1, progress.target));
+  };
   const habitName = (habit) => habit.name || t().habitNames[habit.id] || '';
   const legacyIcons = {
     '🌙': 'sleep', '🌅': 'wake', '☀️': 'wake', '🏃': 'workout', '📖': 'reading',
@@ -619,7 +622,13 @@
   const habitRatioLabel = (habit) => {
     if (habit.kind === 'reading') return `${habit.minutes} / ${habit.target}`;
     if (habit.kind === 'custom' && habit.quantified && habit.frequency.type === 'daily') return `${habit.value || 0} / ${habit.target}`;
-    return `${habit.weekDone} / ${habit.weekTarget}`;
+    const progress = currentWeekProgress(habit);
+    if (habit.kind === 'time') {
+      return state.language === 'zh'
+        ? `记录 ${progress.recorded} · 达标 ${progress.complete}/${progress.target}`
+        : `${progress.recorded} logged · ${progress.complete}/${progress.target} on plan`;
+    }
+    return `${progress.complete} / ${progress.target}`;
   };
 
   const statusSymbol = (habit) => habit.complete ? '✓' : habit.recorded ? '•' : '+';
@@ -665,6 +674,15 @@
       return actualMinutes <= targetMinutes ? 'complete' : 'recorded';
     }
     return entry.status;
+  };
+
+  const currentWeekProgress = (habit) => {
+    const statuses = currentWeekDateKeys().map((date) => historyStatus(date, habit.id));
+    return {
+      recorded: statuses.filter((status) => status !== 'none').length,
+      complete: statuses.filter((status) => status === 'complete').length,
+      target: habit.weekTarget,
+    };
   };
 
   const renderReview = () => {
@@ -864,31 +882,27 @@
       bucket.dateKeys.map((date) => state.history?.[date]?.wake?.value).filter(Boolean),
     ));
     const x = (index) => chartX(index, buckets.length);
-    const bedY = chartYScale(bedValues, bedPlanMinutes, 22, 66, 90);
-    const wakeY = chartYScale(wakeValues, wakePlanMinutes, 96, 140, 75);
+    const wakeY = chartYScale(wakeValues, wakePlanMinutes, 22, 66, 75);
+    const bedY = chartYScale(bedValues, bedPlanMinutes, 96, 140, 90);
     const bedPlanY = bedY(bedPlanMinutes);
     const wakePlanY = wakeY(wakePlanMinutes);
     const bedPoints = bedValues.map((value, index) => Number.isFinite(value) ? `${x(index)},${bedY(value)}` : '').filter(Boolean).join(' ');
     const wakePoints = wakeValues.map((value, index) => Number.isFinite(value) ? `${x(index)},${wakeY(value)}` : '').filter(Boolean).join(' ');
-    const weeklyPointClass = (bucket, habitId) => {
-      if (reviewPeriod !== 'week') return '';
-      return historyStatus(bucket.dateKeys[0], habitId) === 'complete' ? 'is-on-target' : 'is-missed';
-    };
     elements.sleepChart.setAttribute('aria-label', `${t().actualBedtime}, ${t().actualWake}`);
     elements.sleepChart.innerHTML = `
-      <line class="chart-plan" x1="54" y1="${bedPlanY}" x2="340" y2="${bedPlanY}"></line>
-      <text class="chart-axis-label is-plan-label" x="49" y="${bedPlanY + 3}" text-anchor="end">${formatTimeMinutes(bedPlanMinutes)}</text>
       <line class="chart-plan" x1="54" y1="${wakePlanY}" x2="340" y2="${wakePlanY}"></line>
       <text class="chart-axis-label is-plan-label" x="49" y="${wakePlanY + 3}" text-anchor="end">${formatTimeMinutes(wakePlanMinutes)}</text>
-      <polyline class="chart-line" points="${bedPoints}"></polyline>
-      <polyline class="chart-line-wake" points="${wakePoints}"></polyline>
-      ${bedValues.map((value, index) => Number.isFinite(value) ? `
-        <circle class="chart-point ${weeklyPointClass(buckets[index], 'sleep')}" cx="${x(index)}" cy="${bedY(value)}" r="4"></circle>
-        <text class="chart-value-label" x="${x(index)}" y="${bedY(value) - 7}" text-anchor="middle">${formatTimeMinutes(value)}</text>
-      ` : '').join('')}
+      <line class="chart-plan" x1="54" y1="${bedPlanY}" x2="340" y2="${bedPlanY}"></line>
+      <text class="chart-axis-label is-plan-label" x="49" y="${bedPlanY + 3}" text-anchor="end">${formatTimeMinutes(bedPlanMinutes)}</text>
+      <polyline class="chart-line" points="${wakePoints}"></polyline>
+      <polyline class="chart-line-wake" points="${bedPoints}"></polyline>
       ${wakeValues.map((value, index) => Number.isFinite(value) ? `
-        <circle class="chart-point-wake ${weeklyPointClass(buckets[index], 'wake')}" cx="${x(index)}" cy="${wakeY(value)}" r="4"></circle>
+        <circle class="chart-point" cx="${x(index)}" cy="${wakeY(value)}" r="4"></circle>
         <text class="chart-value-label" x="${x(index)}" y="${wakeY(value) - 7}" text-anchor="middle">${formatTimeMinutes(value)}</text>
+      ` : '').join('')}
+      ${bedValues.map((value, index) => Number.isFinite(value) ? `
+        <circle class="chart-point-wake" cx="${x(index)}" cy="${bedY(value)}" r="4"></circle>
+        <text class="chart-value-label" x="${x(index)}" y="${bedY(value) - 7}" text-anchor="middle">${formatTimeMinutes(value)}</text>
       ` : '').join('')}
       ${buckets.map((bucket, index) => `<text class="chart-label" x="${x(index)}" y="166" text-anchor="middle">${bucket.label}</text>`).join('')}
     `;
@@ -2311,9 +2325,13 @@
 
   const configureMetricInput = (metricType) => {
     const targetInput = document.getElementById('habit-target');
+    const fieldPair = targetInput.closest('.field-pair');
+    const unitField = document.getElementById('habit-unit-field');
     targetInput.type = metricType === 'time' ? 'time' : 'number';
     targetInput.min = metricType === 'time' ? '' : '1';
     if (metricType === 'time' && !String(targetInput.value).includes(':')) targetInput.value = '23:30';
+    unitField.hidden = metricType === 'time';
+    fieldPair.classList.toggle('is-single-field', metricType === 'time');
   };
 
   const openHabitEditor = (habitId) => {

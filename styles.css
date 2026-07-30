@@ -469,18 +469,6 @@ h2 {
   stroke-width: 2.5;
 }
 
-.chart-point.is-on-target,
-.chart-point-wake.is-on-target {
-  fill: var(--green-soft);
-  stroke: var(--green);
-}
-
-.chart-point.is-missed,
-.chart-point-wake.is-missed {
-  fill: var(--sun-soft);
-  stroke: var(--sun);
-}
-
 .chart-label {
   fill: var(--text-muted);
   font-size: 9px;
@@ -957,6 +945,10 @@ h2 {
 .field-pair input,
 .field-pair select {
   min-width: 0;
+}
+
+.field-pair.is-single-field {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .plan-note,
@@ -2125,6 +2117,11 @@ h2 {
     gap: 9px;
     padding-right: 10px;
     padding-left: 10px;
+  }
+
+  .field-pair {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
   }
 
   .records-hero {
