@@ -10,7 +10,7 @@
   const bedtimeHistory = ['23:18', '23:42', '23:25', '23:08', '23:51', '23:22', '23:42'];
   const wakeHistory = ['06:54', '07:12', '06:48', '06:58', '07:18', '06:51', '06:52'];
   const weightHistory = [71.2, 71.0, 71.1, 70.9, 70.8, 70.9, 70.8];
-  const SAMPLE_DATA_VERSION = 3;
+  const SAMPLE_DATA_VERSION = 4;
 
   const localDateKey = (date) => {
     const year = date.getFullYear();
@@ -462,7 +462,10 @@
       if (habit.kind === 'weight') habit.value = 70.6;
       return habit;
     });
-    const personalRecords = (loadedState.records || []).filter((record) => !String(record.id).startsWith('sample-'));
+    const personalRecords = (loadedState.records || []).filter((record) => {
+      if (String(record.id).startsWith('sample-')) return false;
+      return localDateKey(new Date(record.createdAt)) !== '2026-07-30';
+    });
     loadedState.records = [...createInitialRecords(), ...personalRecords];
     return loadedState;
   };
@@ -582,21 +585,27 @@
   const formatValueWithUnit = (value, unit) => unit ? `${value} ${unit}` : String(value);
 
   const habitDetail = (habit) => {
-    if (habit.kind === 'time') return t().planActual(habit.target, habit.actual || '—');
+    const todayEntry = state.history?.[localDateKey(new Date())]?.[habit.id];
+    if (habit.kind === 'time') return t().planActual(habit.target, todayEntry?.value || habit.actual || '—');
     if (habit.kind === 'workout') {
       const unit = state.language === 'zh' ? '分钟' : 'min';
-      return t().planActual(`${habit.minuteTarget} ${unit}`, `${habit.minutes} ${unit}`);
+      const actual = todayEntry?.status && todayEntry.status !== 'none'
+        ? `${todayEntry.minutes || 0} ${unit}`
+        : '—';
+      return t().planActual(`${habit.minuteTarget} ${unit}`, actual);
     }
     if (habit.kind === 'reading') {
       const planned = state.language === 'zh' ? `${habit.target} 分钟` : `${habit.target} min`;
-      const actual = state.language === 'zh'
-        ? `${habit.minutes} 分钟 · ${habit.pages} 页`
-        : `${habit.minutes} min · ${habit.pages} pages`;
+      const actual = todayEntry?.status && todayEntry.status !== 'none'
+        ? state.language === 'zh'
+          ? `${todayEntry.minutes || 0} 分钟 · ${todayEntry.pages || 0} 页`
+          : `${todayEntry.minutes || 0} min · ${todayEntry.pages || 0} pages`
+        : '—';
       return t().planActual(planned, actual);
     }
     if (habit.kind === 'weight') {
       const planned = state.language === 'zh' ? '每天记录' : 'daily log';
-      return t().planActual(planned, `${habit.value} kg`);
+      return t().planActual(planned, Number.isFinite(todayEntry?.value) ? `${todayEntry.value} kg` : '—');
     }
     if (habit.kind === 'custom' && habit.quantified) {
       return t().planActual(
@@ -636,52 +645,43 @@
     `).join('');
   };
 
-  const selectedWeekDateKeys = () => {
-    const start = startOfWeek(new Date());
-    start.setDate(start.getDate() + reviewOffset * 7);
-    return Array.from({ length: 7 }, (_, index) => {
-      const date = new Date(start);
-      date.setDate(date.getDate() + index);
-      return localDateKey(date);
-    });
-  };
-
   const historyStatus = (date, habitId) => state.history?.[date]?.[habitId]?.status || 'none';
 
   const renderReview = () => {
     const sleep = state.habits.find((habit) => habit.id === 'sleep');
     const wake = state.habits.find((habit) => habit.id === 'wake');
-    const selectedWeek = selectedWeekDateKeys();
-    const sleepDone = selectedWeek.filter((date) => historyStatus(date, 'sleep') === 'complete').length;
-    const wakeDone = selectedWeek.filter((date) => historyStatus(date, 'wake') === 'complete').length;
+    const buckets = periodBuckets();
+    const selectedDates = buckets.flatMap((bucket) => bucket.dateKeys);
+    const sleepRecorded = selectedDates.filter((date) => historyStatus(date, 'sleep') !== 'none').length;
+    const wakeRecorded = selectedDates.filter((date) => historyStatus(date, 'wake') !== 'none').length;
+    const sleepDone = selectedDates.filter((date) => historyStatus(date, 'sleep') === 'complete').length;
+    const wakeDone = selectedDates.filter((date) => historyStatus(date, 'wake') === 'complete').length;
     document.getElementById('sleep-week-summary').textContent = sleep || wake
       ? state.language === 'zh'
-        ? `入睡 ${sleepDone}/7 · 起床 ${wakeDone}/7`
-        : `Bed ${sleepDone}/7 · wake ${wakeDone}/7`
+        ? `入睡达标 ${sleepDone}/${sleepRecorded} · 起床达标 ${wakeDone}/${wakeRecorded}`
+        : `Bed target ${sleepDone}/${sleepRecorded} · wake target ${wakeDone}/${wakeRecorded}`
       : t().noData;
     const weight = state.habits.find((habit) => habit.id === 'weight');
-    const selectedWeights = selectedWeek
+    const selectedWeights = selectedDates
       .map((date) => state.history?.[date]?.weight?.value)
       .filter((value) => Number.isFinite(value));
-    const selectedWeight = selectedWeights[selectedWeights.length - 1] ?? weight?.value;
+    const selectedWeight = selectedWeights[selectedWeights.length - 1];
     const selectedWeightChange = selectedWeights.length > 1
       ? (selectedWeights[selectedWeights.length - 1] - selectedWeights[0]).toFixed(1)
       : '0.0';
-    document.getElementById('weight-summary').textContent = weight
-      ? state.language === 'zh' ? `${selectedWeight} kg · 7日 ${selectedWeightChange} kg` : `${selectedWeight} kg · 7 days ${selectedWeightChange} kg`
+    document.getElementById('weight-summary').textContent = weight && Number.isFinite(selectedWeight)
+      ? state.language === 'zh' ? `${selectedWeight} kg · 本期 ${selectedWeightChange} kg` : `${selectedWeight} kg · period ${selectedWeightChange} kg`
       : t().noData;
     document.getElementById('suggestion-title').textContent = t().suggestion;
     renderPeriodHeader();
-    const columns = periodColumns();
+    const columns = buckets.map((bucket) => bucket.label);
     elements.weekMatrix.innerHTML = `
       <thead><tr><th>${t().habits}</th>${columns.map((column) => `<th>${column}</th>`).join('')}</tr></thead>
       <tbody>${state.habits.map((habit) => `
         <tr>
           <td><span class="matrix-habit-icon">${iconMarkup(habit.icon)}</span>${habitName(habit)}</td>
-          ${columns.map((_, index) => {
-            const status = reviewPeriod === 'week'
-              ? historyStatus(selectedWeek[index], habit.id)
-              : habit.weekStates[(index + Math.abs(reviewOffset)) % habit.weekStates.length];
+          ${buckets.map((bucket) => {
+            const status = aggregateHabitStatus(bucket, habit.id);
             return `<td><span class="matrix-mark ${status === 'complete' ? 'is-complete' : status === 'recorded' ? 'is-recorded' : ''}">${status === 'complete' ? '✓' : status === 'recorded' ? '•' : '○'}</span></td>`;
           }).join('')}
         </tr>
@@ -703,12 +703,7 @@
     month: '2-digit', day: '2-digit',
   }).format(date);
 
-  const renderPeriodHeader = () => {
-    document.querySelectorAll('.period-button').forEach((button) => {
-      const selected = button.dataset.period === reviewPeriod;
-      button.classList.toggle('is-selected', selected);
-      button.setAttribute('aria-pressed', String(selected));
-    });
+  const periodBounds = () => {
     const now = new Date();
     let start;
     let end;
@@ -728,6 +723,67 @@
       start = new Date(now.getFullYear() + reviewOffset, 0, 1, 12);
       end = new Date(start.getFullYear(), 11, 31, 12);
     }
+    return { start, end };
+  };
+
+  const datesBetween = (start, end) => {
+    const dates = [];
+    const cursor = new Date(start);
+    while (cursor <= end) {
+      dates.push(localDateKey(cursor));
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return dates;
+  };
+
+  const periodBuckets = () => {
+    const { start, end } = periodBounds();
+    if (reviewPeriod === 'week') {
+      return datesBetween(start, end).map((date, index) => ({
+        label: t().dayNames[index].replace(/^周/, ''),
+        dateKeys: [date],
+      }));
+    }
+    if (reviewPeriod === 'month') {
+      const buckets = [];
+      for (let day = 1; day <= end.getDate(); day += 7) {
+        const bucketStart = new Date(start.getFullYear(), start.getMonth(), day, 12);
+        const bucketEnd = new Date(start.getFullYear(), start.getMonth(), Math.min(day + 6, end.getDate()), 12);
+        buckets.push({
+          label: `${day}–${bucketEnd.getDate()}`,
+          dateKeys: datesBetween(bucketStart, bucketEnd),
+        });
+      }
+      return buckets;
+    }
+    const monthCount = reviewPeriod === 'quarter' ? 3 : 12;
+    return Array.from({ length: monthCount }, (_, index) => {
+      const monthStart = new Date(start.getFullYear(), start.getMonth() + index, 1, 12);
+      const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0, 12);
+      return {
+        label: state.language === 'zh'
+          ? `${monthStart.getMonth() + 1}月`
+          : new Intl.DateTimeFormat('en-US', { month: 'short' }).format(monthStart),
+        dateKeys: datesBetween(monthStart, monthEnd),
+      };
+    });
+  };
+
+  const aggregateHabitStatus = (bucket, habitId) => {
+    const statuses = bucket.dateKeys
+      .map((date) => historyStatus(date, habitId))
+      .filter((status) => status !== 'none');
+    if (!statuses.length) return 'none';
+    return statuses.some((status) => status === 'recorded') ? 'recorded' : 'complete';
+  };
+
+  const renderPeriodHeader = () => {
+    document.querySelectorAll('.period-button').forEach((button) => {
+      const selected = button.dataset.period === reviewPeriod;
+      button.classList.toggle('is-selected', selected);
+      button.setAttribute('aria-pressed', String(selected));
+    });
+    const { start, end } = periodBounds();
     document.getElementById('period-caption').textContent = reviewOffset === 0
       ? t().periodNames[reviewPeriod]
       : `${reviewOffset > 0 ? '+' : ''}${reviewOffset}`;
@@ -736,64 +792,99 @@
       : `${formatShortDate(start)} → ${formatShortDate(end)}`;
   };
 
-  const periodColumns = () => {
-    if (reviewPeriod === 'week') return t().dayNames;
-    if (reviewPeriod === 'month') return state.language === 'zh' ? ['第1周', '第2周', '第3周', '第4周', '第5周'] : ['W1', 'W2', 'W3', 'W4', 'W5'];
-    if (reviewPeriod === 'quarter') return state.language === 'zh' ? ['第1月', '第2月', '第3月'] : ['M1', 'M2', 'M3'];
-    return state.language === 'zh'
-      ? ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
-      : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  };
-
   const timeToMinutes = (value) => {
     const [hours, minutes] = String(value).split(':').map(Number);
     return hours * 60 + minutes;
   };
 
+  const average = (values) => values.length
+    ? values.reduce((total, value) => total + value, 0) / values.length
+    : null;
+
+  const averageTime = (values, isBedtime = false) => {
+    const minutes = values.map((value) => {
+      const result = timeToMinutes(value);
+      return isBedtime && result < 12 * 60 ? result + 24 * 60 : result;
+    });
+    return average(minutes);
+  };
+
+  const formatTimeMinutes = (minutes) => {
+    if (!Number.isFinite(minutes)) return '';
+    const normalized = Math.round(minutes) % (24 * 60);
+    return `${String(Math.floor(normalized / 60)).padStart(2, '0')}:${String(normalized % 60).padStart(2, '0')}`;
+  };
+
+  const chartX = (index, count) => count <= 1 ? 196 : 74 + index * (264 / (count - 1));
+
   const renderSleepChart = () => {
-    const selectedWeek = selectedWeekDateKeys();
-    const bedValues = selectedWeek.map((date) => state.history?.[date]?.sleep?.value || null);
-    const wakeValues = selectedWeek.map((date) => state.history?.[date]?.wake?.value || null);
-    const x = (index) => 34 + index * 48;
-    const bedY = (value) => 20 + (timeToMinutes(value) - (22 * 60 + 50)) / 70 * 45;
-    const wakeY = (value) => 93 + (timeToMinutes(value) - (6 * 60 + 35)) / 55 * 42;
-    const bedPlanY = bedY('23:30');
-    const wakePlanY = wakeY('07:00');
-    const bedPoints = bedValues.map((value, index) => value ? `${x(index)},${bedY(value)}` : '').filter(Boolean).join(' ');
-    const wakePoints = wakeValues.map((value, index) => value ? `${x(index)},${wakeY(value)}` : '').filter(Boolean).join(' ');
+    const buckets = periodBuckets();
+    const bedValues = buckets.map((bucket) => averageTime(
+      bucket.dateKeys.map((date) => state.history?.[date]?.sleep?.value).filter(Boolean),
+      true,
+    ));
+    const wakeValues = buckets.map((bucket) => averageTime(
+      bucket.dateKeys.map((date) => state.history?.[date]?.wake?.value).filter(Boolean),
+    ));
+    const x = (index) => chartX(index, buckets.length);
+    const bedY = (value) => 18 + (value - 22.75 * 60) / (1.5 * 60) * 48;
+    const wakeY = (value) => 92 + (value - 6.5 * 60) / (1.25 * 60) * 48;
+    const bedPlanY = bedY(23.5 * 60);
+    const wakePlanY = wakeY(7 * 60);
+    const bedPoints = bedValues.map((value, index) => Number.isFinite(value) ? `${x(index)},${bedY(value)}` : '').filter(Boolean).join(' ');
+    const wakePoints = wakeValues.map((value, index) => Number.isFinite(value) ? `${x(index)},${wakeY(value)}` : '').filter(Boolean).join(' ');
     elements.sleepChart.setAttribute('aria-label', `${t().actualBedtime}, ${t().actualWake}`);
     elements.sleepChart.innerHTML = `
-      <line class="chart-grid" x1="34" y1="20" x2="326" y2="20"></line>
-      <line class="chart-grid" x1="34" y1="70" x2="326" y2="70"></line>
-      <line class="chart-grid" x1="34" y1="92" x2="326" y2="92"></line>
-      <line class="chart-grid" x1="34" y1="137" x2="326" y2="137"></line>
-      <line class="chart-plan" x1="34" y1="${bedPlanY}" x2="326" y2="${bedPlanY}"></line>
-      <line class="chart-plan" x1="34" y1="${wakePlanY}" x2="326" y2="${wakePlanY}"></line>
+      ${[['23:00', 23 * 60], ['23:30', 23.5 * 60], ['00:00', 24 * 60]].map(([label, value]) => `
+        <line class="chart-grid" x1="54" y1="${bedY(value)}" x2="340" y2="${bedY(value)}"></line>
+        <text class="chart-axis-label" x="49" y="${bedY(value) + 3}" text-anchor="end">${label}</text>
+      `).join('')}
+      ${[['06:30', 6.5 * 60], ['07:00', 7 * 60], ['07:30', 7.5 * 60]].map(([label, value]) => `
+        <line class="chart-grid" x1="54" y1="${wakeY(value)}" x2="340" y2="${wakeY(value)}"></line>
+        <text class="chart-axis-label" x="49" y="${wakeY(value) + 3}" text-anchor="end">${label}</text>
+      `).join('')}
+      <line class="chart-plan" x1="54" y1="${bedPlanY}" x2="340" y2="${bedPlanY}"></line>
+      <line class="chart-plan" x1="54" y1="${wakePlanY}" x2="340" y2="${wakePlanY}"></line>
       <polyline class="chart-line" points="${bedPoints}"></polyline>
       <polyline class="chart-line-wake" points="${wakePoints}"></polyline>
-      ${bedValues.map((value, index) => value ? `<circle class="chart-point" cx="${x(index)}" cy="${bedY(value)}" r="4"></circle>` : '').join('')}
-      ${wakeValues.map((value, index) => value ? `<circle class="chart-point-wake" cx="${x(index)}" cy="${wakeY(value)}" r="4"></circle>` : '').join('')}
-      ${t().dayNames.map((day, index) => `<text class="chart-label" x="${x(index)}" y="157" text-anchor="middle">${day.replace(/^周/, '')}</text>`).join('')}
+      ${bedValues.map((value, index) => Number.isFinite(value) ? `
+        <circle class="chart-point" cx="${x(index)}" cy="${bedY(value)}" r="4"></circle>
+        <text class="chart-value-label" x="${x(index)}" y="${bedY(value) - 7}" text-anchor="middle">${formatTimeMinutes(value)}</text>
+      ` : '').join('')}
+      ${wakeValues.map((value, index) => Number.isFinite(value) ? `
+        <circle class="chart-point-wake" cx="${x(index)}" cy="${wakeY(value)}" r="4"></circle>
+        <text class="chart-value-label" x="${x(index)}" y="${wakeY(value) - 7}" text-anchor="middle">${formatTimeMinutes(value)}</text>
+      ` : '').join('')}
+      ${buckets.map((bucket, index) => `<text class="chart-label" x="${x(index)}" y="166" text-anchor="middle">${bucket.label}</text>`).join('')}
     `;
   };
 
   const renderWeightChart = () => {
-    const selectedWeek = selectedWeekDateKeys();
-    const values = selectedWeek.map((date) => state.history?.[date]?.weight?.value ?? null);
+    const buckets = periodBuckets();
+    const values = buckets.map((bucket) => average(
+      bucket.dateKeys
+        .map((date) => state.history?.[date]?.weight?.value)
+        .filter((value) => Number.isFinite(value)),
+    ));
     const numericValues = values.filter((value) => Number.isFinite(value));
-    const chartValues = numericValues.length ? numericValues : weightHistory;
+    const chartValues = numericValues.length ? numericValues : [70.5, 70.8];
     const min = Math.min(...chartValues) - 0.15;
     const max = Math.max(...chartValues) + 0.15;
-    const x = (index) => 34 + index * 48;
+    const mid = (min + max) / 2;
+    const x = (index) => chartX(index, buckets.length);
     const y = (value) => 20 + (max - value) / Math.max(0.1, max - min) * 108;
     elements.weightChart.setAttribute('aria-label', t().weightTrend);
     elements.weightChart.innerHTML = `
-      <line class="chart-grid" x1="34" y1="22" x2="326" y2="22"></line>
-      <line class="chart-grid" x1="34" y1="76" x2="326" y2="76"></line>
-      <line class="chart-grid" x1="34" y1="130" x2="326" y2="130"></line>
+      ${[[max, 20], [mid, 74], [min, 128]].map(([value, yPosition]) => `
+        <line class="chart-grid" x1="54" y1="${yPosition}" x2="340" y2="${yPosition}"></line>
+        <text class="chart-axis-label" x="49" y="${yPosition + 3}" text-anchor="end">${value.toFixed(1)}</text>
+      `).join('')}
       <polyline class="chart-line" points="${values.map((value, index) => Number.isFinite(value) ? `${x(index)},${y(value)}` : '').filter(Boolean).join(' ')}"></polyline>
-      ${values.map((value, index) => Number.isFinite(value) ? `<circle class="chart-point" cx="${x(index)}" cy="${y(value)}" r="4"></circle>` : '').join('')}
-      ${t().dayNames.map((day, index) => `<text class="chart-label" x="${x(index)}" y="157" text-anchor="middle">${day.replace(/^周/, '')}</text>`).join('')}
+      ${values.map((value, index) => Number.isFinite(value) ? `
+        <circle class="chart-point" cx="${x(index)}" cy="${y(value)}" r="4"></circle>
+        <text class="chart-value-label" x="${x(index)}" y="${y(value) - 8}" text-anchor="middle">${value.toFixed(1)}</text>
+      ` : '').join('')}
+      ${buckets.map((bucket, index) => `<text class="chart-label" x="${x(index)}" y="157" text-anchor="middle">${bucket.label}</text>`).join('')}
     `;
   };
 
