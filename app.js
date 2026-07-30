@@ -10,6 +10,56 @@
   const bedtimeHistory = ['23:18', '23:42', '23:25', '23:08', '23:51', '23:22', '23:42'];
   const wakeHistory = ['06:54', '07:12', '06:48', '06:58', '07:18', '06:51', '06:52'];
   const weightHistory = [71.2, 71.0, 71.1, 70.9, 70.8, 70.9, 70.8];
+  const SAMPLE_DATA_VERSION = 3;
+
+  const localDateKey = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const sampleHistoryRows = [
+    ['2026-07-13', '23:25', '06:55', 71.4, 32, 18, 0, '', false],
+    ['2026-07-14', '23:48', '07:08', 71.3, 20, 11, 42, '力量训练', true],
+    ['2026-07-15', '23:12', '06:48', 71.2, 35, 24, 0, '', false],
+    ['2026-07-16', '23:36', '06:58', 71.1, 30, 19, 35, '跑步', true],
+    ['2026-07-17', '23:20', '07:05', 71.2, 42, 31, 0, '', false],
+    ['2026-07-18', '00:05', '07:42', 71.0, 15, 9, 50, '瑜伽', true],
+    ['2026-07-19', '23:28', '06:59', 71.0, 33, 22, 0, '', false],
+    ['2026-07-20', '23:18', '06:52', 70.9, 36, 25, 38, '快走', true],
+    ['2026-07-21', '23:44', '07:10', 70.9, 28, 16, 0, '', false],
+    ['2026-07-22', '23:26', '06:49', 70.8, 40, 30, 45, '力量训练', true],
+    ['2026-07-23', '23:15', '06:56', 70.9, 31, 20, 0, '', false],
+    ['2026-07-24', '23:52', '07:16', 70.8, 18, 12, 32, '跑步', true],
+    ['2026-07-25', '23:29', '07:02', 70.7, 34, 27, 0, '', false],
+    ['2026-07-26', '23:21', '06:57', 70.8, 37, 28, 0, '', true],
+    ['2026-07-27', '23:22', '06:50', 70.8, 36, 26, 0, '', true],
+    ['2026-07-28', '23:41', '07:12', 70.7, 22, 14, 46, '力量训练', false],
+    ['2026-07-29', '23:18', '06:55', 70.6, 41, 33, 0, '', true],
+  ];
+
+  const createSampleHistory = () => Object.fromEntries(sampleHistoryRows.map(([
+    date, sleep, wake, weight, readingMinutes, readingPages, workoutMinutes, activityType, footbath,
+  ]) => [
+    date,
+    {
+      sleep: { status: sleep >= '05:00' && sleep <= '23:30' ? 'complete' : 'recorded', value: sleep },
+      wake: { status: wake <= '07:00' ? 'complete' : 'recorded', value: wake },
+      workout: {
+        status: workoutMinutes ? 'complete' : 'none',
+        minutes: workoutMinutes,
+        activityType,
+      },
+      reading: {
+        status: readingMinutes >= 30 ? 'complete' : 'recorded',
+        minutes: readingMinutes,
+        pages: readingPages,
+      },
+      weight: { status: 'complete', value: weight },
+      footbath: { status: footbath ? 'complete' : 'none' },
+    },
+  ]));
 
   const copy = {
     zh: {
@@ -310,12 +360,6 @@
   ];
 
   const createInitialRecords = () => {
-    const now = new Date();
-    const dateForOffset = (offset) => {
-      const date = new Date(now);
-      date.setDate(date.getDate() - offset);
-      return date.toISOString();
-    };
     return [
       {
         id: 'sample-reading-1',
@@ -326,7 +370,7 @@
         sourceText: '真正的答案并不总在最响亮的证词里，而在那些被忽略的小地方。',
         images: ['./assets/icons/reading.png?v=2', './assets/icons/study.png?v=2'],
         metrics: { minutes: 42, pages: 36 },
-        createdAt: dateForOffset(0),
+        createdAt: '2026-07-28T20:40:00+08:00',
       },
       {
         id: 'sample-reading-2',
@@ -337,7 +381,7 @@
         sourceText: '自由不是没有约束，而是知道自己愿意为什么负责。',
         images: ['./assets/icons/reading.png?v=2'],
         metrics: { minutes: 28, pages: 21 },
-        createdAt: dateForOffset(3),
+        createdAt: '2026-07-22T21:10:00+08:00',
       },
       {
         id: 'sample-workout-1',
@@ -348,7 +392,7 @@
         sourceText: '跑步 · 后半程节奏更稳定',
         images: ['./assets/icons/workout.png?v=2', './assets/icons/walk.png?v=2'],
         metrics: { minutes: 31, activityType: '跑步' },
-        createdAt: dateForOffset(1),
+        createdAt: '2026-07-24T19:20:00+08:00',
       },
       {
         id: 'sample-workout-2',
@@ -359,13 +403,15 @@
         sourceText: '力量训练 · 深蹲、划船、肩推',
         images: ['./assets/icons/workout.png?v=2'],
         metrics: { minutes: 46, activityType: '力量训练' },
-        createdAt: dateForOffset(5),
+        createdAt: '2026-07-16T18:35:00+08:00',
       },
     ];
   };
 
   const cloneInitialState = () => ({
     language: 'zh',
+    sampleDataVersion: 0,
+    history: createSampleHistory(),
     records: createInitialRecords(),
     habits: initialHabits.map((habit) => ({
       ...habit,
@@ -374,6 +420,52 @@
       recordOptions: { ...habit.recordOptions },
     })),
   });
+
+  const currentWeekDateKeys = () => {
+    const today = new Date();
+    const monday = new Date(today);
+    const day = monday.getDay() || 7;
+    monday.setDate(monday.getDate() - day + 1);
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(monday);
+      date.setDate(date.getDate() + index);
+      return localDateKey(date);
+    });
+  };
+
+  const applyRequestedSampleData = (loadedState) => {
+    if (loadedState.sampleDataVersion >= SAMPLE_DATA_VERSION) return loadedState;
+    loadedState.sampleDataVersion = SAMPLE_DATA_VERSION;
+    loadedState.history = createSampleHistory();
+    const weekKeys = currentWeekDateKeys();
+    const todayIndex = (new Date().getDay() + 6) % 7;
+    loadedState.habits = loadedState.habits.map((habit) => {
+      const weekStates = weekKeys.map((date) => loadedState.history[date]?.[habit.id]?.status || 'none');
+      habit.weekStates = weekStates;
+      habit.weekDone = weekStates.filter((status) => status === 'complete').length;
+      habit.recorded = false;
+      habit.complete = false;
+      habit.weekStates[todayIndex] = 'none';
+      if (habit.kind === 'time') habit.actual = '';
+      if (habit.kind === 'workout') {
+        const entries = weekKeys
+          .slice(0, todayIndex)
+          .map((date) => loadedState.history[date]?.workout)
+          .filter(Boolean);
+        habit.minutes = entries.reduce((total, entry) => total + (entry.minutes || 0), 0);
+        habit.actual = entries.filter((entry) => entry.status !== 'none').length;
+      }
+      if (habit.kind === 'reading') {
+        habit.minutes = 0;
+        habit.pages = 0;
+      }
+      if (habit.kind === 'weight') habit.value = 70.6;
+      return habit;
+    });
+    const personalRecords = (loadedState.records || []).filter((record) => !String(record.id).startsWith('sample-'));
+    loadedState.records = [...createInitialRecords(), ...personalRecords];
+    return loadedState;
+  };
 
   const loadState = () => {
     try {
@@ -384,10 +476,12 @@
           recordOptions: habit.recordOptions || { text: false, photo: false, voice: false },
         }));
         if (!Array.isArray(parsed.records)) parsed.records = createInitialRecords();
-        return parsed;
+        const migrated = applyRequestedSampleData(parsed);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+        return migrated;
       }
     } catch {}
-    return cloneInitialState();
+    return applyRequestedSampleData(cloneInitialState());
   };
 
   let state = loadState();
@@ -422,6 +516,25 @@
 
   const t = () => copy[state.language];
   const persist = () => localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  const todayWeekIndex = () => (new Date().getDay() + 6) % 7;
+  const recordTodayInHistory = (habit, details = {}) => {
+    const date = localDateKey(new Date());
+    state.history ||= {};
+    state.history[date] ||= {};
+    const status = habit.complete ? 'complete' : habit.recorded ? 'recorded' : 'none';
+    const entry = { status };
+    if (habit.kind === 'time') entry.value = habit.actual;
+    if (habit.kind === 'workout') {
+      entry.minutes = details.minutes || 0;
+      entry.activityType = details.activityType || '';
+    }
+    if (habit.kind === 'reading') {
+      entry.minutes = habit.minutes;
+      entry.pages = habit.pages;
+    }
+    if (habit.kind === 'weight') entry.value = habit.value;
+    state.history[date][habit.id] = entry;
+  };
   const ratio = (habit) => Math.min(1, habit.weekDone / Math.max(1, habit.weekTarget));
   const habitName = (habit) => habit.name || t().habitNames[habit.id] || '';
   const legacyIcons = {
@@ -523,17 +636,39 @@
     `).join('');
   };
 
+  const selectedWeekDateKeys = () => {
+    const start = startOfWeek(new Date());
+    start.setDate(start.getDate() + reviewOffset * 7);
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(start);
+      date.setDate(date.getDate() + index);
+      return localDateKey(date);
+    });
+  };
+
+  const historyStatus = (date, habitId) => state.history?.[date]?.[habitId]?.status || 'none';
+
   const renderReview = () => {
     const sleep = state.habits.find((habit) => habit.id === 'sleep');
     const wake = state.habits.find((habit) => habit.id === 'wake');
+    const selectedWeek = selectedWeekDateKeys();
+    const sleepDone = selectedWeek.filter((date) => historyStatus(date, 'sleep') === 'complete').length;
+    const wakeDone = selectedWeek.filter((date) => historyStatus(date, 'wake') === 'complete').length;
     document.getElementById('sleep-week-summary').textContent = sleep || wake
       ? state.language === 'zh'
-        ? `入睡 ${sleep?.weekDone ?? 0}/7 · 起床 ${wake?.weekDone ?? 0}/7`
-        : `Bed ${sleep?.weekDone ?? 0}/7 · wake ${wake?.weekDone ?? 0}/7`
+        ? `入睡 ${sleepDone}/7 · 起床 ${wakeDone}/7`
+        : `Bed ${sleepDone}/7 · wake ${wakeDone}/7`
       : t().noData;
     const weight = state.habits.find((habit) => habit.id === 'weight');
+    const selectedWeights = selectedWeek
+      .map((date) => state.history?.[date]?.weight?.value)
+      .filter((value) => Number.isFinite(value));
+    const selectedWeight = selectedWeights[selectedWeights.length - 1] ?? weight?.value;
+    const selectedWeightChange = selectedWeights.length > 1
+      ? (selectedWeights[selectedWeights.length - 1] - selectedWeights[0]).toFixed(1)
+      : '0.0';
     document.getElementById('weight-summary').textContent = weight
-      ? state.language === 'zh' ? `${weight.value} kg · 7日 ${weight.change} kg` : `${weight.value} kg · 7 days ${weight.change} kg`
+      ? state.language === 'zh' ? `${selectedWeight} kg · 7日 ${selectedWeightChange} kg` : `${selectedWeight} kg · 7 days ${selectedWeightChange} kg`
       : t().noData;
     document.getElementById('suggestion-title').textContent = t().suggestion;
     renderPeriodHeader();
@@ -544,7 +679,9 @@
         <tr>
           <td><span class="matrix-habit-icon">${iconMarkup(habit.icon)}</span>${habitName(habit)}</td>
           ${columns.map((_, index) => {
-            const status = habit.weekStates[(index + Math.abs(reviewOffset)) % habit.weekStates.length];
+            const status = reviewPeriod === 'week'
+              ? historyStatus(selectedWeek[index], habit.id)
+              : habit.weekStates[(index + Math.abs(reviewOffset)) % habit.weekStates.length];
             return `<td><span class="matrix-mark ${status === 'complete' ? 'is-complete' : status === 'recorded' ? 'is-recorded' : ''}">${status === 'complete' ? '✓' : status === 'recorded' ? '•' : '○'}</span></td>`;
           }).join('')}
         </tr>
@@ -614,19 +751,16 @@
   };
 
   const renderSleepChart = () => {
-    const bedValues = [...bedtimeHistory];
-    const wakeValues = [...wakeHistory];
-    const sleep = state.habits.find((habit) => habit.id === 'sleep');
-    const wake = state.habits.find((habit) => habit.id === 'wake');
-    if (sleep?.actual) bedValues[6] = sleep.actual;
-    if (wake?.actual) wakeValues[6] = wake.actual;
+    const selectedWeek = selectedWeekDateKeys();
+    const bedValues = selectedWeek.map((date) => state.history?.[date]?.sleep?.value || null);
+    const wakeValues = selectedWeek.map((date) => state.history?.[date]?.wake?.value || null);
     const x = (index) => 34 + index * 48;
     const bedY = (value) => 20 + (timeToMinutes(value) - (22 * 60 + 50)) / 70 * 45;
     const wakeY = (value) => 93 + (timeToMinutes(value) - (6 * 60 + 35)) / 55 * 42;
     const bedPlanY = bedY('23:30');
     const wakePlanY = wakeY('07:00');
-    const bedPoints = bedValues.map((value, index) => `${x(index)},${bedY(value)}`).join(' ');
-    const wakePoints = wakeValues.map((value, index) => `${x(index)},${wakeY(value)}`).join(' ');
+    const bedPoints = bedValues.map((value, index) => value ? `${x(index)},${bedY(value)}` : '').filter(Boolean).join(' ');
+    const wakePoints = wakeValues.map((value, index) => value ? `${x(index)},${wakeY(value)}` : '').filter(Boolean).join(' ');
     elements.sleepChart.setAttribute('aria-label', `${t().actualBedtime}, ${t().actualWake}`);
     elements.sleepChart.innerHTML = `
       <line class="chart-grid" x1="34" y1="20" x2="326" y2="20"></line>
@@ -637,18 +771,19 @@
       <line class="chart-plan" x1="34" y1="${wakePlanY}" x2="326" y2="${wakePlanY}"></line>
       <polyline class="chart-line" points="${bedPoints}"></polyline>
       <polyline class="chart-line-wake" points="${wakePoints}"></polyline>
-      ${bedValues.map((value, index) => `<circle class="chart-point" cx="${x(index)}" cy="${bedY(value)}" r="4"></circle>`).join('')}
-      ${wakeValues.map((value, index) => `<circle class="chart-point-wake" cx="${x(index)}" cy="${wakeY(value)}" r="4"></circle>`).join('')}
+      ${bedValues.map((value, index) => value ? `<circle class="chart-point" cx="${x(index)}" cy="${bedY(value)}" r="4"></circle>` : '').join('')}
+      ${wakeValues.map((value, index) => value ? `<circle class="chart-point-wake" cx="${x(index)}" cy="${wakeY(value)}" r="4"></circle>` : '').join('')}
       ${t().dayNames.map((day, index) => `<text class="chart-label" x="${x(index)}" y="157" text-anchor="middle">${day.replace(/^周/, '')}</text>`).join('')}
     `;
   };
 
   const renderWeightChart = () => {
-    const values = [...weightHistory];
-    const weight = state.habits.find((habit) => habit.id === 'weight');
-    if (typeof weight?.value === 'number') values[6] = weight.value;
-    const min = Math.min(...values) - 0.15;
-    const max = Math.max(...values) + 0.15;
+    const selectedWeek = selectedWeekDateKeys();
+    const values = selectedWeek.map((date) => state.history?.[date]?.weight?.value ?? null);
+    const numericValues = values.filter((value) => Number.isFinite(value));
+    const chartValues = numericValues.length ? numericValues : weightHistory;
+    const min = Math.min(...chartValues) - 0.15;
+    const max = Math.max(...chartValues) + 0.15;
     const x = (index) => 34 + index * 48;
     const y = (value) => 20 + (max - value) / Math.max(0.1, max - min) * 108;
     elements.weightChart.setAttribute('aria-label', t().weightTrend);
@@ -656,8 +791,8 @@
       <line class="chart-grid" x1="34" y1="22" x2="326" y2="22"></line>
       <line class="chart-grid" x1="34" y1="76" x2="326" y2="76"></line>
       <line class="chart-grid" x1="34" y1="130" x2="326" y2="130"></line>
-      <polyline class="chart-line" points="${values.map((value, index) => `${x(index)},${y(value)}`).join(' ')}"></polyline>
-      ${values.map((value, index) => `<circle class="chart-point" cx="${x(index)}" cy="${y(value)}" r="4"></circle>`).join('')}
+      <polyline class="chart-line" points="${values.map((value, index) => Number.isFinite(value) ? `${x(index)},${y(value)}` : '').filter(Boolean).join(' ')}"></polyline>
+      ${values.map((value, index) => Number.isFinite(value) ? `<circle class="chart-point" cx="${x(index)}" cy="${y(value)}" r="4"></circle>` : '').join('')}
       ${t().dayNames.map((day, index) => `<text class="chart-label" x="${x(index)}" y="157" text-anchor="middle">${day.replace(/^周/, '')}</text>`).join('')}
     `;
   };
@@ -1499,13 +1634,17 @@
       readingSession.reflection,
     );
     const previousRecords = [...state.records];
+    const todayKey = localDateKey(new Date());
+    const previousTodayHistory = state.history?.[todayKey]?.[habit.id]
+      ? { ...state.history[todayKey][habit.id] }
+      : null;
     const previousHabit = {
       minutes: habit.minutes,
       pages: habit.pages,
       recorded: habit.recorded,
       complete: habit.complete,
       weekDone: habit.weekDone,
-      weekState: habit.weekStates[6],
+      weekState: habit.weekStates[todayWeekIndex()],
       latestReadingRecord: habit.latestReadingRecord,
     };
     const wasComplete = habit.complete;
@@ -1534,7 +1673,8 @@
     });
     if (!wasComplete && habit.complete) habit.weekDone = Math.min(habit.weekTarget, habit.weekDone + 1);
     if (wasComplete && !habit.complete) habit.weekDone = Math.max(0, habit.weekDone - 1);
-    habit.weekStates[6] = habit.complete ? 'complete' : 'recorded';
+    habit.weekStates[todayWeekIndex()] = habit.complete ? 'complete' : 'recorded';
+    recordTodayInHistory(habit);
     try {
       persist();
     } catch {
@@ -1543,9 +1683,11 @@
       habit.recorded = previousHabit.recorded;
       habit.complete = previousHabit.complete;
       habit.weekDone = previousHabit.weekDone;
-      habit.weekStates[6] = previousHabit.weekState;
+      habit.weekStates[todayWeekIndex()] = previousHabit.weekState;
       habit.latestReadingRecord = previousHabit.latestReadingRecord;
       state.records = previousRecords;
+      if (previousTodayHistory) state.history[todayKey][habit.id] = previousTodayHistory;
+      else delete state.history?.[todayKey]?.[habit.id];
       readingSession.status = '图片较多，当前设备存储空间不足，请减少图片后重试';
       renderReadingPreview(false);
       return;
@@ -1572,7 +1714,8 @@
     habit.complete = habit.minutes >= habit.target;
     if (!wasComplete && habit.complete) habit.weekDone = Math.min(habit.weekTarget, habit.weekDone + 1);
     if (wasComplete && !habit.complete) habit.weekDone = Math.max(0, habit.weekDone - 1);
-    habit.weekStates[6] = habit.complete ? 'complete' : 'recorded';
+    habit.weekStates[todayWeekIndex()] = habit.complete ? 'complete' : 'recorded';
+    recordTodayInHistory(habit);
     persist();
     closeLayers();
     renderAll();
@@ -1693,7 +1836,8 @@
       habit.recorded = !habit.recorded;
       habit.complete = habit.recorded;
       habit.weekDone += habit.recorded ? 1 : -1;
-      habit.weekStates[6] = habit.recorded ? 'complete' : 'none';
+      habit.weekStates[todayWeekIndex()] = habit.recorded ? 'complete' : 'none';
+      recordTodayInHistory(habit);
       persist();
       renderAll();
       showToast(habit.recorded ? t().completedToday : t().tapToComplete);
@@ -1746,7 +1890,8 @@
         habit.recorded = !habit.recorded;
         habit.complete = habit.recorded;
         habit.weekDone += habit.recorded ? 1 : -1;
-        habit.weekStates[6] = habit.recorded ? 'complete' : 'none';
+        habit.weekStates[todayWeekIndex()] = habit.recorded ? 'complete' : 'none';
+        recordTodayInHistory(habit);
         persist();
         renderAll();
         showToast(habit.recorded ? t().completedToday : t().tapToComplete);
@@ -1835,13 +1980,17 @@
     session.title = session.title || fallbackRecordTitle('workout', session.activityType, session.note, session.activityType);
     const wasComplete = habit.complete;
     const previousRecords = [...state.records];
+    const todayKey = localDateKey(new Date());
+    const previousTodayHistory = state.history?.[todayKey]?.[habit.id]
+      ? { ...state.history[todayKey][habit.id] }
+      : null;
     const previousHabit = {
       minutes: habit.minutes,
       actual: habit.actual,
       recorded: habit.recorded,
       complete: habit.complete,
       weekDone: habit.weekDone,
-      weekState: habit.weekStates[6],
+      weekState: habit.weekStates[todayWeekIndex()],
       note: habit.note,
     };
     habit.minutes += session.minutes;
@@ -1851,7 +2000,8 @@
     habit.note = session.note;
     if (!wasComplete && habit.complete) habit.weekDone = Math.min(habit.weekTarget, habit.weekDone + 1);
     if (wasComplete && !habit.complete) habit.weekDone = Math.max(0, habit.weekDone - 1);
-    habit.weekStates[6] = habit.complete ? 'complete' : 'recorded';
+    habit.weekStates[todayWeekIndex()] = habit.complete ? 'complete' : 'recorded';
+    recordTodayInHistory(habit, { minutes: session.minutes, activityType: session.activityType });
     state.records.unshift({
       id: `workout-${Date.now()}`,
       type: 'workout',
@@ -1874,8 +2024,10 @@
         weekDone: previousHabit.weekDone,
         note: previousHabit.note,
       });
-      habit.weekStates[6] = previousHabit.weekState;
+      habit.weekStates[todayWeekIndex()] = previousHabit.weekState;
       state.records = previousRecords;
+      if (previousTodayHistory) state.history[todayKey][habit.id] = previousTodayHistory;
+      else delete state.history?.[todayKey]?.[habit.id];
       elements.result.textContent = '当前设备存储空间不足，请减少图片后重试';
       return;
     }
@@ -1944,7 +2096,13 @@
 
     if (!wasComplete && habit.complete) habit.weekDone = Math.min(habit.weekTarget, habit.weekDone + 1);
     if (wasComplete && !habit.complete) habit.weekDone = Math.max(0, habit.weekDone - 1);
-    habit.weekStates[6] = habit.complete ? 'complete' : habit.recorded ? 'recorded' : 'none';
+    habit.weekStates[todayWeekIndex()] = habit.complete ? 'complete' : habit.recorded ? 'recorded' : 'none';
+    recordTodayInHistory(habit, habit.kind === 'workout'
+      ? {
+        minutes: Number(document.getElementById('workout-minutes')?.value) || 0,
+        activityType: document.getElementById('activity-type')?.value || '',
+      }
+      : {});
     persist();
     closeLayers();
     renderAll();
