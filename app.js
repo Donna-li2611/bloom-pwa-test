@@ -645,7 +645,27 @@
     `).join('');
   };
 
-  const historyStatus = (date, habitId) => state.history?.[date]?.[habitId]?.status || 'none';
+  const normalizedBedtimeMinutes = (value) => {
+    const minutes = timeToMinutes(value);
+    return minutes < 12 * 60 ? minutes + 24 * 60 : minutes;
+  };
+
+  const historyStatus = (date, habitId) => {
+    const entry = state.history?.[date]?.[habitId];
+    if (!entry || entry.status === 'none') return 'none';
+    if ((habitId === 'sleep' || habitId === 'wake') && entry.value) {
+      const habit = state.habits.find((item) => item.id === habitId);
+      if (!habit?.target) return entry.status;
+      const actualMinutes = habitId === 'sleep'
+        ? normalizedBedtimeMinutes(entry.value)
+        : timeToMinutes(entry.value);
+      const targetMinutes = habitId === 'sleep'
+        ? normalizedBedtimeMinutes(habit.target)
+        : timeToMinutes(habit.target);
+      return actualMinutes <= targetMinutes ? 'complete' : 'recorded';
+    }
+    return entry.status;
+  };
 
   const renderReview = () => {
     const sleep = state.habits.find((habit) => habit.id === 'sleep');
@@ -820,8 +840,22 @@
 
   const chartX = (index, count) => count <= 1 ? 196 : 74 + index * (264 / (count - 1));
 
+  const chartYScale = (values, plan, top, bottom, minimumSpan) => {
+    const available = values.filter((value) => Number.isFinite(value));
+    const lowest = Math.min(plan, ...available);
+    const highest = Math.max(plan, ...available);
+    const span = Math.max(minimumSpan, highest - lowest + 30);
+    const center = (lowest + highest) / 2;
+    const minimum = center - span / 2;
+    return (value) => top + (value - minimum) / span * (bottom - top);
+  };
+
   const renderSleepChart = () => {
     const buckets = periodBuckets();
+    const sleepHabit = state.habits.find((habit) => habit.id === 'sleep');
+    const wakeHabit = state.habits.find((habit) => habit.id === 'wake');
+    const bedPlanMinutes = normalizedBedtimeMinutes(sleepHabit?.target || '23:30');
+    const wakePlanMinutes = timeToMinutes(wakeHabit?.target || '07:00');
     const bedValues = buckets.map((bucket) => averageTime(
       bucket.dateKeys.map((date) => state.history?.[date]?.sleep?.value).filter(Boolean),
       true,
@@ -830,10 +864,10 @@
       bucket.dateKeys.map((date) => state.history?.[date]?.wake?.value).filter(Boolean),
     ));
     const x = (index) => chartX(index, buckets.length);
-    const bedY = (value) => 18 + (value - 22.75 * 60) / (1.5 * 60) * 48;
-    const wakeY = (value) => 92 + (value - 6.5 * 60) / (1.25 * 60) * 48;
-    const bedPlanY = bedY(23.5 * 60);
-    const wakePlanY = wakeY(7 * 60);
+    const bedY = chartYScale(bedValues, bedPlanMinutes, 22, 66, 90);
+    const wakeY = chartYScale(wakeValues, wakePlanMinutes, 96, 140, 75);
+    const bedPlanY = bedY(bedPlanMinutes);
+    const wakePlanY = wakeY(wakePlanMinutes);
     const bedPoints = bedValues.map((value, index) => Number.isFinite(value) ? `${x(index)},${bedY(value)}` : '').filter(Boolean).join(' ');
     const wakePoints = wakeValues.map((value, index) => Number.isFinite(value) ? `${x(index)},${wakeY(value)}` : '').filter(Boolean).join(' ');
     const weeklyPointClass = (bucket, habitId) => {
@@ -843,9 +877,9 @@
     elements.sleepChart.setAttribute('aria-label', `${t().actualBedtime}, ${t().actualWake}`);
     elements.sleepChart.innerHTML = `
       <line class="chart-plan" x1="54" y1="${bedPlanY}" x2="340" y2="${bedPlanY}"></line>
-      <text class="chart-axis-label is-plan-label" x="49" y="${bedPlanY + 3}" text-anchor="end">23:30</text>
+      <text class="chart-axis-label is-plan-label" x="49" y="${bedPlanY + 3}" text-anchor="end">${formatTimeMinutes(bedPlanMinutes)}</text>
       <line class="chart-plan" x1="54" y1="${wakePlanY}" x2="340" y2="${wakePlanY}"></line>
-      <text class="chart-axis-label is-plan-label" x="49" y="${wakePlanY + 3}" text-anchor="end">07:00</text>
+      <text class="chart-axis-label is-plan-label" x="49" y="${wakePlanY + 3}" text-anchor="end">${formatTimeMinutes(wakePlanMinutes)}</text>
       <polyline class="chart-line" points="${bedPoints}"></polyline>
       <polyline class="chart-line-wake" points="${wakePoints}"></polyline>
       ${bedValues.map((value, index) => Number.isFinite(value) ? `
@@ -2355,6 +2389,10 @@
       else if (existing.kind === 'workout' && metricType === 'duration') existing.minuteTarget = Number(target);
       else if (existing.kind === 'reading' && metricType === 'duration') existing.target = Number(target);
       else if (existing.kind === 'custom') Object.assign(existing, { quantified, metricType, target, unit });
+      if (existing.kind === 'time') {
+        existing.weekStates = currentWeekDateKeys().map((date) => historyStatus(date, existing.id));
+        existing.weekDone = existing.weekStates.filter((status) => status === 'complete').length;
+      }
       showToast(t().habitUpdated);
     } else {
       state.habits.push({
@@ -2472,9 +2510,19 @@
       pendingDeleteHabitId = null;
       const menu = elements.managedHabitList.querySelector(`[data-menu-for="${menuButton.dataset.habitMenu}"]`);
       elements.managedHabitList.querySelectorAll('.habit-action-menu').forEach((item) => {
-        if (item !== menu) item.hidden = true;
+        if (item !== menu) {
+          item.hidden = true;
+          item.closest('.managed-habit')?.classList.remove('has-open-menu');
+        }
       });
-      menu.hidden = !menu.hidden;
+      const shouldOpen = menu.hidden;
+      menu.hidden = !shouldOpen;
+      const card = menuButton.closest('.managed-habit');
+      card?.classList.toggle('has-open-menu', shouldOpen);
+      if (shouldOpen) {
+        const availableBelow = window.innerHeight - menuButton.getBoundingClientRect().bottom - 16;
+        menu.classList.toggle('opens-upward', availableBelow < menu.offsetHeight);
+      }
       return;
     }
     const editButton = event.target.closest('[data-edit-habit]');

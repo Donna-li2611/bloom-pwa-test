@@ -686,6 +686,7 @@ h2 {
 
 .managed-habit-list {
   margin-top: 28px;
+  overflow: visible;
 }
 
 .managed-habit {
@@ -697,6 +698,10 @@ h2 {
   padding: 15px;
   border-bottom: 1px solid var(--line);
   background: var(--surface);
+}
+
+.managed-habit.has-open-menu {
+  z-index: 14;
 }
 
 .managed-habit.is-hidden-habit {
@@ -768,6 +773,11 @@ h2 {
   border-radius: 14px;
   background: var(--surface);
   box-shadow: 0 12px 30px rgba(42, 39, 31, 0.18);
+}
+
+.habit-action-menu.opens-upward {
+  top: auto;
+  bottom: 45px;
 }
 
 .habit-action-menu button {
@@ -939,8 +949,14 @@ h2 {
 
 .field-pair {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 14px;
+}
+
+.field-pair > .field,
+.field-pair input,
+.field-pair select {
+  min-width: 0;
 }
 
 .plan-note,
