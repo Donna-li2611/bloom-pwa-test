@@ -93,7 +93,6 @@
       weightTrend: '体重趋势',
       futureHealthData: '未来可通过 IoT 加入体脂率、BMI 等身体数据',
       noData: '暂无记录',
-      nextWeek: '下周可以试试',
       record: '记录',
       saveRecord: '保存记录',
       manageHabits: '管理习惯',
@@ -157,7 +156,6 @@
       recordedSummary: (recorded, total) => `${recorded} / ${total} 已记录`,
       weekSummary: (done, total) => `${done} / ${total} 天按计划`,
       reviewSummary: (rate) => `本周按照计划完成 ${rate}%。记录本身也会保留，即使当天没有达到目标。`,
-      suggestion: '把两天的入睡时间提前15分钟；运动再完成1次，就能达到本周计划。',
       actualPlan: (actual, plan) => `实际 ${actual} · 计划 ${plan}`,
       planActual: (plan, actual) => `计划 ${plan} · 实际 ${actual}`,
       weekMinutes: (actual, target) => `本周 ${actual} / ${target} 分钟`,
@@ -169,7 +167,7 @@
       intervalFrequency: (days) => `每隔 ${days} 天`,
       simpleCheckin: '点击即可完成',
       quantified: (label) => `记录${label}`,
-      saved: '记录已保存',
+      saved: '打卡成功',
       habitCreated: '新习惯已加入原型',
       habitUpdated: '习惯配置已更新',
       timeLabel: '实际时间',
@@ -177,11 +175,13 @@
       minutes: '分钟',
       pages: '页数',
       activity: '运动类型',
-      activityOptions: ['快走', '跑步', '力量训练', '瑜伽', '其他'],
+      activityOptions: ['羽毛球', '乒乓球', '高尔夫', '骑单车', '瑜伽', '其他'],
+      otherActivity: '其他运动',
+      otherActivityPlaceholder: '请输入运动类型',
       weight: '体重（kg）',
       quality: '睡眠质量（可选）',
       qualityOptions: ['不记录', '很好', '还不错', '一般', '较差'],
-      completedToday: '今天已完成',
+      completedToday: '打卡成功',
       tapToComplete: '点击完成今天的打卡',
       mon: '一', tue: '二', wed: '三', thu: '四', fri: '五', sat: '六', sun: '日',
       dayNames: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
@@ -224,7 +224,6 @@
       weightTrend: 'Weight trend',
       futureHealthData: 'IoT may add body fat, BMI, and other body data later',
       noData: 'No records yet',
-      nextWeek: 'Try this next week',
       record: 'Record',
       saveRecord: 'Save record',
       manageHabits: 'Manage habits',
@@ -288,7 +287,6 @@
       recordedSummary: (recorded, total) => `${recorded} / ${total} recorded`,
       weekSummary: (done, total) => `${done} / ${total} days on plan`,
       reviewSummary: (rate) => `You followed ${rate}% of this week’s plan. Records remain visible even when a target was not reached.`,
-      suggestion: 'Move two bedtimes 15 minutes earlier; one more workout will complete the weekly plan.',
       actualPlan: (actual, plan) => `Actual ${actual} · plan ${plan}`,
       planActual: (plan, actual) => `Plan ${plan} · actual ${actual}`,
       weekMinutes: (actual, target) => `${actual} / ${target} min this week`,
@@ -308,7 +306,9 @@
       minutes: 'Minutes',
       pages: 'Pages',
       activity: 'Activity',
-      activityOptions: ['Walk', 'Run', 'Strength', 'Yoga', 'Other'],
+      activityOptions: ['Badminton', 'Table tennis', 'Golf', 'Cycling', 'Yoga', 'Other'],
+      otherActivity: 'Other activity',
+      otherActivityPlaceholder: 'Enter an activity',
       weight: 'Weight (kg)',
       quality: 'Sleep quality (optional)',
       qualityOptions: ['Do not record', 'Great', 'Good', 'Fair', 'Poor'],
@@ -536,6 +536,7 @@
       entry.pages = habit.pages;
     }
     if (habit.kind === 'weight') entry.value = habit.value;
+    if (habit.kind === 'custom' && habit.quantified) entry.value = habit.value;
     state.history[date][habit.id] = entry;
   };
   const ratio = (habit) => {
@@ -611,12 +612,20 @@
       return t().planActual(planned, Number.isFinite(todayEntry?.value) ? `${todayEntry.value} kg` : '—');
     }
     if (habit.kind === 'custom' && habit.quantified) {
+      const actual = todayEntry?.status && todayEntry.status !== 'none'
+        ? formatValueWithUnit(todayEntry.value, habit.unit)
+        : '—';
       return t().planActual(
         formatValueWithUnit(habit.target, habit.unit),
-        formatValueWithUnit(habit.value || 0, habit.unit),
+        actual,
       );
     }
-    return t().planActual(formatFrequency(habit.frequency), habit.recorded ? '✓' : '—');
+    return t().planActual(
+      formatFrequency(habit.frequency),
+      todayEntry?.status && todayEntry.status !== 'none'
+        ? state.language === 'zh' ? '打卡成功' : 'Check-in complete'
+        : '—',
+    );
   };
 
   const habitRatioLabel = (habit) => {
@@ -676,6 +685,25 @@
     return entry.status;
   };
 
+  const syncTodayHabitState = () => {
+    const today = localDateKey(new Date());
+    const entries = state.history?.[today] || {};
+    state.habits.forEach((habit) => {
+      const entry = entries[habit.id];
+      const status = historyStatus(today, habit.id);
+      habit.recorded = status !== 'none';
+      habit.complete = status === 'complete';
+      if (habit.kind === 'time') habit.actual = entry?.value || '';
+      if (habit.kind === 'reading') {
+        habit.minutes = entry?.minutes || 0;
+        habit.pages = entry?.pages || 0;
+      }
+      if (habit.kind === 'custom' && habit.quantified) {
+        habit.value = entry?.value ?? '';
+      }
+    });
+  };
+
   const currentWeekProgress = (habit) => {
     const statuses = currentWeekDateKeys().map((date) => historyStatus(date, habit.id));
     return {
@@ -710,7 +738,6 @@
     document.getElementById('weight-summary').textContent = weight && Number.isFinite(selectedWeight)
       ? state.language === 'zh' ? `${selectedWeight} kg · 本期 ${selectedWeightChange} kg` : `${selectedWeight} kg · period ${selectedWeightChange} kg`
       : t().noData;
-    document.getElementById('suggestion-title').textContent = t().suggestion;
     renderPeriodHeader();
     const columns = buckets.map((bucket) => bucket.label);
     const matrixScroll = elements.weekMatrix.closest('.matrix-scroll');
@@ -1008,7 +1035,9 @@
         .filter((record) => record.type === type)
         .sort((first, second) => new Date(second.createdAt) - new Date(first.createdAt));
       const label = type === 'reading' ? t().readingRecords : t().workoutRecords;
-      const description = type === 'reading' ? '摘录、感悟与阅读现场' : '训练、身体感受与现场';
+      const description = type === 'reading'
+        ? '摘录、当下感悟与心情记录'
+        : '锻炼、身体感受与结伴同行';
       return `
         <section class="record-section">
           <header class="record-section-heading">
@@ -1122,6 +1151,7 @@
   };
 
   const renderAll = () => {
+    syncTodayHabitState();
     renderCopy();
     renderDate();
     renderToday();
@@ -1854,7 +1884,7 @@
     persist();
     closeLayers();
     renderAll();
-    showToast('阅读记录已保存');
+    showToast(t().saved);
   };
 
   const setupReadingFlow = () => {
@@ -1955,6 +1985,7 @@
 
   const openCheckin = (habitId) => {
     const habit = state.habits.find((item) => item.id === habitId);
+    const todayEntry = state.history?.[localDateKey(new Date())]?.[habitId];
     activeHabitId = habitId;
     elements.fields.onclick = null;
     elements.fields.onchange = null;
@@ -1981,16 +2012,25 @@
 
     if (habit.kind === 'time') {
       elements.fields.innerHTML = `
-        ${field(t().timeLabel, `<input id="checkin-time" type="time" value="${habit.actual || habit.target}" required>`)}
+        ${field(t().timeLabel, `<input id="checkin-time" type="time" value="${todayEntry?.value || ''}" required>`)}
         <p class="plan-note">${t().plannedTime(habit.target)}</p>
         ${habit.id === 'sleep' ? field(t().quality, `<select id="sleep-quality">${t().qualityOptions.map((option) => `<option>${option}</option>`).join('')}</select>`) : ''}
         ${optionalCheckinFields(habit)}
       `;
     } else if (habit.kind === 'workout') {
+      const activityOptions = t().activityOptions;
+      const savedActivity = todayEntry?.activityType || activityOptions[0];
+      const isOtherActivity = !activityOptions.slice(0, -1).includes(savedActivity);
       elements.fields.innerHTML = `
         <div class="field-pair">
-          ${field(t().minutes, `<input id="workout-minutes" type="number" min="1" value="45" required>`)}
-          ${field(t().activity, `<select id="activity-type">${t().activityOptions.map((option) => `<option>${option}</option>`).join('')}</select>`)}
+          ${field(t().minutes, `<input id="workout-minutes" type="number" min="1" value="${todayEntry?.minutes || ''}" required>`)}
+          ${field(t().activity, `<select id="activity-type">${activityOptions.map((option, index) => {
+            const selected = isOtherActivity ? index === activityOptions.length - 1 : option === savedActivity;
+            return `<option value="${option}" ${selected ? 'selected' : ''}>${option}</option>`;
+          }).join('')}</select>`)}
+        </div>
+        <div id="other-activity-field" ${isOtherActivity ? '' : 'hidden'}>
+          ${field(t().otherActivity, `<input id="other-activity" type="text" maxlength="24" value="${isOtherActivity ? escapeHtml(savedActivity) : ''}" placeholder="${t().otherActivityPlaceholder}">`)}
         </div>
         ${optionalCheckinFields(habit)}
       `;
@@ -2007,8 +2047,8 @@
         titleStatus: '',
         titleLoading: false,
         titleRequested: false,
-        minutes: habit.minutes,
-        pages: habit.pages,
+        minutes: todayEntry?.minutes ?? '',
+        pages: todayEntry?.pages ?? '',
         model: 'qwen3.7-plus',
         loading: false,
         status: '',
@@ -2017,7 +2057,7 @@
       setupReadingFlow();
       return;
     } else if (habit.kind === 'weight') {
-      elements.fields.innerHTML = `${field(t().weight, `<input id="weight-value" type="number" min="1" step="0.1" value="${habit.value}" required>`)}${optionalCheckinFields(habit)}`;
+      elements.fields.innerHTML = `${field(t().weight, `<input id="weight-value" type="number" min="1" step="0.1" value="${Number.isFinite(todayEntry?.value) ? todayEntry.value : ''}" required>`)}${optionalCheckinFields(habit)}`;
     } else if (habit.kind === 'boolean') {
       elements.fields.innerHTML = optionalCheckinFields(habit);
     } else if (habit.kind === 'custom') {
@@ -2039,7 +2079,7 @@
           : '';
         elements.fields.innerHTML = `${field(t().enterValue, `
           <div class="value-input-row">
-            <input id="custom-value" type="${type}" min="0" inputmode="${type === 'number' ? 'decimal' : 'text'}" value="${habit.value || ''}" required>
+            <input id="custom-value" type="${type}" min="0" inputmode="${type === 'number' ? 'decimal' : 'text'}" value="${todayEntry?.value ?? ''}" required>
             ${unitLabel}
           </div>
         `)}${optionalCheckinFields(habit)}`;
@@ -2049,6 +2089,18 @@
     }
     openLayer(elements.sheet);
     setupOptionalInputs(habit);
+    if (habit.kind === 'workout') {
+      const activitySelect = document.getElementById('activity-type');
+      const otherField = document.getElementById('other-activity-field');
+      const updateOtherActivity = (shouldFocus = false) => {
+        const isOther = activitySelect.value === t().activityOptions[t().activityOptions.length - 1];
+        otherField.hidden = !isOther;
+        document.getElementById('other-activity').required = isOther;
+        if (isOther && shouldFocus) document.getElementById('other-activity').focus();
+      };
+      activitySelect.addEventListener('change', () => updateOtherActivity(true));
+      updateOtherActivity();
+    }
   };
 
   const renderWorkoutTitleConfirmation = (habit) => {
@@ -2171,6 +2223,14 @@
     showToast('保存成功，可在“记录”中查看');
   };
 
+  const selectedWorkoutActivity = () => {
+    const selected = document.getElementById('activity-type')?.value || '';
+    const otherOption = t().activityOptions[t().activityOptions.length - 1];
+    return selected === otherOption
+      ? document.getElementById('other-activity')?.value.trim() || otherOption
+      : selected;
+  };
+
   const saveCheckin = () => {
     const habit = state.habits.find((item) => item.id === activeHabitId);
     if (habit?.kind === 'workout' && pendingWorkoutSession) {
@@ -2185,7 +2245,7 @@
       habit.complete = habit.id === 'sleep' ? habit.actual <= habit.target : habit.actual <= habit.target;
     } else if (habit.kind === 'workout') {
       const minutes = Number(document.getElementById('workout-minutes').value);
-      const activityType = document.getElementById('activity-type').value;
+      const activityType = selectedWorkoutActivity();
       const note = document.getElementById('record-note')?.value.trim() || '';
       if (note || selectedCheckinImageDataUrl) {
         pendingWorkoutSession = {
@@ -2235,7 +2295,7 @@
     recordTodayInHistory(habit, habit.kind === 'workout'
       ? {
         minutes: Number(document.getElementById('workout-minutes')?.value) || 0,
-        activityType: document.getElementById('activity-type')?.value || '',
+        activityType: selectedWorkoutActivity(),
       }
       : {});
     persist();
