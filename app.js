@@ -2,6 +2,8 @@
   const STORAGE_KEY = 'bloom-prototype-v02-r2';
   const AI_ENDPOINT = 'https://bloom-ition-api-jtcsdtmpit.cn-beijing.fcapp.run';
   const AI_TOKEN_STORAGE_KEY = 'bloom-ai-test-token';
+  const MEDIA_DB_NAME = 'bloom-media-v1';
+  const MEDIA_STORE_NAME = 'media';
   const AI_MODELS = [
     { id: 'qwen3.7-plus', labelZh: '3.7 · 效果优先', labelEn: '3.7 · Best quality' },
     { id: 'qwen3.5-plus-2026-04-20', labelZh: '3.5 · 成本优先', labelEn: '3.5 · Lower cost' },
@@ -11,6 +13,82 @@
   const wakeHistory = ['06:54', '07:12', '06:48', '06:58', '07:18', '06:51', '06:52'];
   const weightHistory = [71.2, 71.0, 71.1, 70.9, 70.8, 70.9, 70.8];
   const SAMPLE_DATA_VERSION = 4;
+  const mediaUrlCache = new Map();
+
+  const openMediaDatabase = () => new Promise((resolve, reject) => {
+    const request = indexedDB.open(MEDIA_DB_NAME, 1);
+    request.onerror = () => reject(request.error || new Error('media_db_open_failed'));
+    request.onupgradeneeded = () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains(MEDIA_STORE_NAME)) {
+        const store = database.createObjectStore(MEDIA_STORE_NAME, { keyPath: 'id' });
+        store.createIndex('recordId', 'recordId', { unique: false });
+        store.createIndex('recordType', 'recordType', { unique: false });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+  });
+
+  const saveMediaRecords = async (recordId, recordType, dataUrls, source = 'upload') => {
+    const uploadedImages = dataUrls.filter((value) => String(value).startsWith('data:image/'));
+    if (!uploadedImages.length) return [];
+    const database = await openMediaDatabase();
+    const imageIds = uploadedImages.map((dataUrl, index) => `${recordId}-image-${index + 1}`);
+    await new Promise((resolve, reject) => {
+      const transaction = database.transaction(MEDIA_STORE_NAME, 'readwrite');
+      const store = transaction.objectStore(MEDIA_STORE_NAME);
+      uploadedImages.forEach((dataUrl, index) => {
+        const id = imageIds[index];
+        mediaUrlCache.set(id, dataUrl);
+        store.put({
+          id,
+          recordId,
+          recordType,
+          source,
+          mimeType: String(dataUrl).slice(5, String(dataUrl).indexOf(';')) || 'image/jpeg',
+          dataUrl,
+          createdAt: new Date().toISOString(),
+        });
+      });
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error || new Error('media_db_write_failed'));
+      transaction.onabort = () => reject(transaction.error || new Error('media_db_write_aborted'));
+    });
+    database.close();
+    return imageIds;
+  };
+
+  const loadMediaRecords = async (imageIds = []) => {
+    const missingIds = imageIds.filter((id) => id && !mediaUrlCache.has(id));
+    if (!missingIds.length) return;
+    const database = await openMediaDatabase();
+    await new Promise((resolve, reject) => {
+      const transaction = database.transaction(MEDIA_STORE_NAME, 'readonly');
+      const store = transaction.objectStore(MEDIA_STORE_NAME);
+      missingIds.forEach((id) => {
+        const request = store.get(id);
+        request.onsuccess = () => {
+          if (request.result?.dataUrl) mediaUrlCache.set(id, request.result.dataUrl);
+        };
+      });
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error || new Error('media_db_read_failed'));
+    });
+    database.close();
+  };
+
+  const persistRecordImages = async (recordId, recordType, images, source = 'upload') => {
+    const directImages = images.filter((value) => !String(value).startsWith('data:image/'));
+    const uploadedImages = images.filter((value) => String(value).startsWith('data:image/'));
+    try {
+      const imageIds = await saveMediaRecords(recordId, recordType, uploadedImages, source);
+      return { images: directImages, imageIds };
+    } catch {
+      // Older/private browser modes may block IndexedDB. Keep a localStorage fallback
+      // so the user's image is never silently discarded.
+      return { images: [...directImages, ...uploadedImages], imageIds: [] };
+    }
+  };
 
   const localDateKey = (date) => {
     const year = date.getFullYear();
@@ -407,8 +485,7 @@
         type: 'workout',
         habitId: 'workout',
         title: '傍晚跑完，身体先替我放松了',
-        summary: '没有追配速，只保持舒服的呼吸。回家路上觉得头脑也一起变轻了。',
-        sourceText: '跑步 · 后半程节奏更稳定',
+        content: '没有追配速，只保持舒服的呼吸。后半程节奏更稳定，回家路上觉得头脑也一起变轻了。',
         images: ['./assets/icons/workout.png?v=2', './assets/icons/walk.png?v=2'],
         metrics: { minutes: 31, activityType: '跑步' },
         createdAt: '2026-07-24T19:20:00+08:00',
@@ -418,8 +495,7 @@
         type: 'workout',
         habitId: 'workout',
         title: '力量训练后的踏实感',
-        summary: '把动作做慢以后，反而更能感受到身体参与。今天没有加重量，但完成度更高。',
-        sourceText: '力量训练 · 深蹲、划船、肩推',
+        content: '深蹲、划船、肩推。把动作做慢以后，反而更能感受到身体参与。今天没有加重量，但完成度更高。',
         images: ['./assets/icons/workout.png?v=2'],
         metrics: { minutes: 46, activityType: '力量训练' },
         createdAt: '2026-07-16T18:35:00+08:00',
@@ -490,6 +566,22 @@
     return loadedState;
   };
 
+  const normalizeRecordSchema = (record) => {
+    const normalized = {
+      ...record,
+      images: Array.isArray(record.images) ? record.images : [],
+      imageIds: Array.isArray(record.imageIds) ? record.imageIds : [],
+    };
+    if (record.type === 'workout') {
+      normalized.content = record.content || [record.sourceText, record.summary]
+        .filter(Boolean)
+        .join('\n');
+      delete normalized.summary;
+      delete normalized.sourceText;
+    }
+    return normalized;
+  };
+
   const loadState = () => {
     try {
       const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY));
@@ -511,12 +603,15 @@
           parsed.defaultAiModel = AI_MODELS[0].id;
         }
         if (!Array.isArray(parsed.records)) parsed.records = createInitialRecords();
+        parsed.records = parsed.records.map(normalizeRecordSchema);
         const migrated = applyRequestedSampleData(parsed);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
         return migrated;
       }
     } catch {}
-    return applyRequestedSampleData(cloneInitialState());
+    const initialState = applyRequestedSampleData(cloneInitialState());
+    initialState.records = initialState.records.map(normalizeRecordSchema);
+    return initialState;
   };
 
   let state = loadState();
@@ -533,6 +628,34 @@
   let reviewOffset = 0;
   let draggedHabitId = null;
   let pendingDeleteHabitId = null;
+
+  const hydrateAndMigrateRecordMedia = async () => {
+    let changed = false;
+    for (const record of state.records) {
+      record.imageIds = Array.isArray(record.imageIds) ? record.imageIds : [];
+      record.images = Array.isArray(record.images) ? record.images : [];
+      const legacyUploads = record.images.filter((image) => String(image).startsWith('data:image/'));
+      if (legacyUploads.length) {
+        const storedMedia = await persistRecordImages(record.id, record.type, record.images);
+        if (storedMedia.imageIds.length) {
+          record.images = storedMedia.images;
+          record.imageIds = [...new Set([...record.imageIds, ...storedMedia.imageIds])];
+          changed = true;
+        }
+      }
+      await loadMediaRecords(record.imageIds).catch(() => {});
+    }
+    const latestReading = state.habits.find((habit) => habit.id === 'reading')?.latestReadingRecord;
+    if (latestReading) {
+      const matchingRecord = state.records.find((record) => record.id === latestReading.id);
+      if (matchingRecord) {
+        latestReading.images = [...matchingRecord.images];
+        latestReading.imageIds = [...matchingRecord.imageIds];
+      }
+    }
+    if (changed) persist();
+    renderAll();
+  };
   let toastTimer = null;
 
   const elements = {
@@ -1048,8 +1171,14 @@
     return '运动记录';
   };
 
+  const recordImageSources = (record) => {
+    const directImages = Array.isArray(record.images) ? record.images.filter(Boolean) : [];
+    const storedImages = (record.imageIds || []).map((id) => mediaUrlCache.get(id)).filter(Boolean);
+    return [...new Set([...directImages, ...storedImages])].slice(0, 9);
+  };
+
   const recordImagesMarkup = (record, detail = false) => {
-    const images = Array.isArray(record.images) ? record.images.filter(Boolean).slice(0, 9) : [];
+    const images = recordImageSources(record);
     if (!images.length) return '';
     if (detail) {
       return `
@@ -1072,7 +1201,7 @@
 
   const recordEntryMarkup = (record) => {
     const date = recordDateParts(record.createdAt);
-    const summary = record.summary || record.sourceText || '';
+    const summary = record.content || record.summary || record.sourceText || '';
     return `
       <button class="record-entry" type="button" data-record-id="${escapeHtml(record.id)}">
         <span class="record-entry-date"><small>${date.month}</small><strong>${date.day}</strong><small>${date.weekday}</small></span>
@@ -1146,15 +1275,16 @@
       <article class="record-detail">
         <p class="record-detail-date">${escapeHtml(date.full)} · ${escapeHtml(recordMetricText(record))}</p>
         ${recordImagesMarkup(record, true)}
-        ${record.summary ? `<section><h3>${record.type === 'reading' ? '我的感悟' : record.type === 'dream' ? 'AI 解读（已由用户确认）' : '身体感受'}</h3><p>${escapeHtml(record.summary)}</p></section>` : ''}
-        ${record.sourceText ? `<section><h3>${record.type === 'reading' ? '摘录原文' : record.type === 'dream' ? '我的梦境' : '训练内容'}</h3><p class="record-detail-source">${escapeHtml(record.sourceText)}</p></section>` : ''}
+        ${record.type === 'workout' && record.content ? `<section><h3>身体感受/训练内容</h3><p class="record-detail-source">${escapeHtml(record.content)}</p></section>` : ''}
+        ${record.type !== 'workout' && record.summary ? `<section><h3>${record.type === 'reading' ? '我的感悟' : 'AI 解读（已由用户确认）'}</h3><p>${escapeHtml(record.summary)}</p></section>` : ''}
+        ${record.type !== 'workout' && record.sourceText ? `<section><h3>${record.type === 'reading' ? '摘录原文' : '我的梦境'}</h3><p class="record-detail-source">${escapeHtml(record.sourceText)}</p></section>` : ''}
         ${record.type === 'dream' ? '<p class="record-detail-note">AI 解读仅用于自我记录与联想，不代表诊断或预言。</p>' : ''}
       </article>
     `;
     elements.fields.onclick = (event) => {
       const imageButton = event.target.closest('[data-record-image]');
       if (!imageButton) return;
-      const src = record.images?.[Number(imageButton.dataset.recordImage)];
+      const src = recordImageSources(record)[Number(imageButton.dataset.recordImage)];
       if (src) showRecordLightbox(src);
     };
     openLayer(elements.sheet);
@@ -1264,11 +1394,15 @@
   const optionalCheckinFields = (habit) => {
     const options = habit.recordOptions || {};
     if (!Object.values(options).some(Boolean)) return '';
+    const noteLabel = habit.kind === 'workout' ? '身体感受/训练内容' : t().textNote;
+    const notePlaceholder = habit.kind === 'workout'
+      ? '记录训练内容、身体感受或同行的人…'
+      : t().notePlaceholder;
     return `
       <div class="field">
-        <label for="record-note">${t().textNote}</label>
+        <label for="record-note">${noteLabel}</label>
         <div class="note-composer">
-          <textarea class="note-textarea" id="record-note" placeholder="${t().notePlaceholder}">${habit.note || ''}</textarea>
+          <textarea class="note-textarea" id="record-note" placeholder="${notePlaceholder}">${habit.note || ''}</textarea>
           <div class="note-actions">
             <label class="attachment-button" for="record-photo">▧ ${t().photo}</label>
             <input id="record-photo" type="file" accept="image/*" hidden>
@@ -1871,7 +2005,7 @@
     }
   };
 
-  const saveReadingRecord = () => {
+  const saveReadingRecord = async () => {
     const habit = state.habits.find((item) => item.id === activeHabitId);
     syncReadingTitle();
     readingSession.title = readingSession.title || fallbackRecordTitle(
@@ -1894,15 +2028,22 @@
       latestReadingRecord: habit.latestReadingRecord,
     };
     const wasComplete = habit.complete;
+    const recordId = `reading-${Date.now()}`;
+    const storedMedia = await persistRecordImages(
+      recordId,
+      'reading',
+      readingSession.images.map((image) => image.dataUrl),
+    );
     habit.minutes = readingSession.minutes;
     habit.pages = readingSession.pages;
     habit.recorded = true;
     habit.complete = habit.minutes >= habit.target;
     habit.latestReadingRecord = {
-      id: `reading-${Date.now()}`,
+      id: recordId,
       createdAt: new Date().toISOString(),
       title: readingSession.title,
-      images: readingSession.images.map((image) => image.dataUrl),
+      images: storedMedia.images,
+      imageIds: storedMedia.imageIds,
       sourceText: readingSession.confirmedSource || confirmCompleteReadingSource(),
       reflection: readingSession.reflection,
     };
@@ -1914,6 +2055,7 @@
       summary: readingSession.reflection,
       sourceText: habit.latestReadingRecord.sourceText,
       images: habit.latestReadingRecord.images,
+      imageIds: habit.latestReadingRecord.imageIds,
       metrics: { minutes: readingSession.minutes, pages: readingSession.pages },
       createdAt: habit.latestReadingRecord.createdAt,
     });
@@ -2165,6 +2307,8 @@
     habit.complete = true;
     if (!wasComplete) habit.weekDone = Math.min(habit.weekTarget, habit.weekDone + 1);
     habit.weekStates[todayWeekIndex()] = 'complete';
+    const existingRecordIndex = state.records.findIndex((record) => record.id === recordId);
+    const existingRecord = existingRecordIndex >= 0 ? state.records[existingRecordIndex] : null;
     const dreamRecord = {
       id: recordId,
       type: 'dream',
@@ -2172,11 +2316,11 @@
       title: fallbackDreamTitle(dreamSession.dreamText),
       summary: dreamSession.interpretation,
       sourceText: dreamSession.dreamText,
-      images: [],
+      images: existingRecord?.images || [],
+      imageIds: existingRecord?.imageIds || [],
       metrics: {},
       createdAt: new Date().toISOString(),
     };
-    const existingRecordIndex = state.records.findIndex((record) => record.id === recordId);
     if (existingRecordIndex >= 0) {
       dreamRecord.createdAt = state.records[existingRecordIndex].createdAt;
       state.records.splice(existingRecordIndex, 1, dreamRecord);
@@ -2349,7 +2493,7 @@
           </div>
           ${session.image ? `<div class="record-detail-images"><button type="button" id="workout-preview-image"><img src="${escapeHtml(session.image)}" alt="运动记录图片"></button></div>` : ''}
           <div class="reading-record-section">
-            <strong>身体感受</strong>
+            <strong>身体感受/训练内容</strong>
             <p>${escapeHtml(session.note || '尚未填写文字')}</p>
           </div>
         </section>
@@ -2385,7 +2529,7 @@
     document.getElementById('workout-preview-image')?.addEventListener('click', () => showRecordLightbox(session.image));
   };
 
-  const commitWorkoutCheckin = (habit) => {
+  const commitWorkoutCheckin = async (habit) => {
     const session = pendingWorkoutSession;
     session.title = document.getElementById('workout-record-title')?.value.trim() || session.title;
     session.title = session.title || fallbackRecordTitle('workout', session.activityType, session.note, session.activityType);
@@ -2404,6 +2548,12 @@
       weekState: habit.weekStates[todayWeekIndex()],
       note: habit.note,
     };
+    const recordId = `workout-${Date.now()}`;
+    const storedMedia = await persistRecordImages(
+      recordId,
+      'workout',
+      session.image ? [session.image] : [],
+    );
     habit.minutes += session.minutes;
     habit.actual += habit.recorded ? 0 : 1;
     habit.recorded = true;
@@ -2414,13 +2564,13 @@
     habit.weekStates[todayWeekIndex()] = habit.complete ? 'complete' : 'recorded';
     recordTodayInHistory(habit, { minutes: session.minutes, activityType: session.activityType });
     state.records.unshift({
-      id: `workout-${Date.now()}`,
+      id: recordId,
       type: 'workout',
       habitId: habit.id,
       title: session.title,
-      summary: session.note,
-      sourceText: session.activityType,
-      images: session.image ? [session.image] : [],
+      content: session.note,
+      images: storedMedia.images,
+      imageIds: storedMedia.imageIds,
       metrics: { minutes: session.minutes, activityType: session.activityType },
       createdAt: new Date().toISOString(),
     });
@@ -2455,7 +2605,7 @@
       : selected;
   };
 
-  const saveCheckin = () => {
+  const saveCheckin = async () => {
     const habit = state.habits.find((item) => item.id === activeHabitId);
     if (!habit) return;
     if (habit.kind === 'dream' && dreamSession) {
@@ -2463,7 +2613,7 @@
       return;
     }
     if (habit?.kind === 'workout' && pendingWorkoutSession) {
-      commitWorkoutCheckin(habit);
+      await commitWorkoutCheckin(habit);
       return;
     }
     const wasComplete = habit.complete;
@@ -2748,9 +2898,9 @@
     if (button) openCheckin(button.dataset.checkin);
   });
 
-  document.getElementById('checkin-form').addEventListener('submit', (event) => {
+  document.getElementById('checkin-form').addEventListener('submit', async (event) => {
     event.preventDefault();
-    saveCheckin();
+    await saveCheckin();
   });
   document.getElementById('close-sheet').addEventListener('click', closeLayers);
   document.getElementById('close-habit-sheet').addEventListener('click', closeLayers);
@@ -2990,6 +3140,9 @@
   });
 
   renderAll();
+  hydrateAndMigrateRecordMedia().catch(() => {
+    // Records remain usable with the localStorage fallback when IndexedDB is unavailable.
+  });
 
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     window.addEventListener('load', () => {
