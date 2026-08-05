@@ -807,6 +807,99 @@ h2 {
   font-size: 13px;
 }
 
+.model-settings {
+  margin-top: 28px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 10px 28px rgba(65, 57, 41, 0.06);
+}
+
+.model-settings-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.model-settings-heading h2,
+.model-settings-heading p {
+  margin: 0;
+}
+
+.model-settings-heading > span {
+  padding: 6px 9px;
+  border-radius: 999px;
+  color: #557044;
+  background: var(--green-soft);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.model-settings-copy {
+  margin: 10px 0 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.model-settings-list {
+  display: grid;
+  gap: 10px;
+}
+
+.model-setting-option {
+  width: 100%;
+  min-height: 66px;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 17px;
+  color: var(--text);
+  text-align: left;
+  background: var(--surface-soft);
+  cursor: pointer;
+}
+
+.model-setting-option.is-selected {
+  border-color: rgba(108, 139, 76, 0.65);
+  background: var(--green-soft);
+}
+
+.model-setting-option strong,
+.model-setting-option small {
+  display: block;
+}
+
+.model-setting-option small {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.model-setting-option b {
+  color: var(--green);
+  font-size: 12px;
+}
+
+.model-setting-radio {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #b8b9b1;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 4px transparent;
+}
+
+.model-setting-option.is-selected .model-setting-radio {
+  border-color: var(--green);
+  background: var(--green);
+  box-shadow: inset 0 0 0 4px var(--green-soft);
+}
+
 .bottom-nav {
   position: fixed;
   z-index: 10;
@@ -1943,6 +2036,106 @@ h2 {
 
 .record-type-dot.is-reading {
   background: var(--green);
+}
+
+.record-type-dot.is-dream {
+  background: #8f7ac3;
+}
+
+.dream-flow {
+  display: grid;
+  gap: 14px;
+}
+
+.dream-editor-card,
+.dream-future-card {
+  padding: 17px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface-soft);
+}
+
+.dream-ai-card {
+  border-color: rgba(108, 139, 76, 0.32);
+  background: #fbf8ec;
+}
+
+.dream-ai-card .reading-section-head button {
+  min-height: 40px;
+  padding: 8px 11px;
+  border: 0;
+  border-radius: 13px;
+  color: white;
+  background: var(--green);
+  font-weight: 800;
+}
+
+.dream-textarea {
+  width: 100%;
+  min-height: 150px;
+  margin-top: 12px;
+  padding: 14px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  color: var(--text);
+  background: white;
+  font: inherit;
+  line-height: 1.65;
+}
+
+.dream-interpretation {
+  min-height: 180px;
+}
+
+.dream-token-label {
+  display: block;
+  margin: 12px 0 6px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.dream-ai-card > input,
+.dream-ai-card > select {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  color: var(--text);
+  background: white;
+}
+
+.dream-ai-disclaimer,
+.record-detail-note {
+  margin: 10px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.dream-future-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: linear-gradient(135deg, #f1edf9, #fff7e9);
+}
+
+.dream-future-card > span {
+  color: #8f7ac3;
+  font-size: 24px;
+}
+
+.dream-future-card strong,
+.dream-future-card small {
+  display: block;
+}
+
+.dream-future-card small {
+  margin-top: 3px;
+  color: var(--text-muted);
+  line-height: 1.45;
 }
 
 .record-image-stack {
