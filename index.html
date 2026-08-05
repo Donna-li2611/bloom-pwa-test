@@ -13,7 +13,7 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="apple-touch-icon" href="./assets/pwa/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="./assets/pwa/bloom-icon-192.png">
-  <link rel="stylesheet" href="./styles.css?v=20">
+  <link rel="stylesheet" href="./styles.css?v=21">
 </head>
 <body>
   <main class="app-shell">
@@ -101,6 +101,7 @@
           <button class="record-filter is-selected" type="button" data-record-filter="all" aria-pressed="true" data-i18n="allRecords">全部</button>
           <button class="record-filter" type="button" data-record-filter="reading" aria-pressed="false" data-i18n="readingRecords">阅读</button>
           <button class="record-filter" type="button" data-record-filter="workout" aria-pressed="false" data-i18n="workoutRecords">运动</button>
+          <button class="record-filter" type="button" data-record-filter="dream" aria-pressed="false" data-i18n="dreamRecords">梦境</button>
         </div>
       </header>
       <div class="record-sections" id="record-sections"></div>
@@ -116,6 +117,18 @@
         <p class="review-summary" data-i18n="manageHabitsHint">用简单的名称表达习惯，把频率和记录方式交给 Bloom。</p>
       </header>
       <div class="managed-habit-list" id="managed-habit-list"></div>
+      <section class="model-settings" aria-labelledby="model-settings-title">
+        <div class="model-settings-heading">
+          <div>
+            <p class="date-label" data-i18n="modelSettings">模型设置</p>
+            <h2 id="model-settings-title" data-i18n="aiModel">AI 模型</h2>
+          </div>
+          <span data-i18n="localOnly">仅保存在本机</span>
+        </div>
+        <p class="model-settings-copy" data-i18n="modelSettingsHint">选择 Bloom 默认调用的模型。图片识别、阅读感悟、标题和梦境解读会优先使用它。</p>
+        <div class="model-settings-list" id="model-settings-list"></div>
+        <p class="future-inline" data-i18n="futureModels">后续可添加更多模型，并按任务分别选择。</p>
+      </section>
     </section>
 
     <nav class="bottom-nav" aria-label="主要导航">
@@ -133,7 +146,7 @@
       </button>
       <button class="nav-button" type="button" data-page="habits-page">
         <span class="nav-icon" aria-hidden="true">✦</span>
-        <span data-i18n="habits">习惯</span>
+        <span data-i18n="settings">设置</span>
       </button>
     </nav>
   </main>
@@ -274,6 +287,6 @@
   </section>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="./app.js?v=20"></script>
+  <script src="./app.js?v=21"></script>
 </body>
 </html>
