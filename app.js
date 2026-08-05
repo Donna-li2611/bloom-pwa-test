@@ -76,7 +76,14 @@
       allRecords: '全部',
       readingRecords: '阅读',
       workoutRecords: '运动',
+      dreamRecords: '梦境',
       habits: '习惯',
+      settings: '设置',
+      modelSettings: '模型设置',
+      aiModel: 'AI 模型',
+      localOnly: '仅保存在本机',
+      modelSettingsHint: '选择 Bloom 默认调用的模型。图片识别、阅读感悟、标题和梦境解读会优先使用它。',
+      futureModels: '后续可添加更多模型，并按任务分别选择。',
       weeklyReview: '本周复盘',
       planAndActual: '计划与实际',
       bedtime: '入睡时间',
@@ -187,10 +194,10 @@
       dayNames: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
       metricLabels: { duration: '时长', count: '次数', number: '数值', time: '时间' },
       trackingLabels: {
-        sleep: '记录时间', wake: '记录时间', workout: '记录时长', reading: '记录时长和页数', weight: '记录数值', footbath: '点击完成',
+        sleep: '记录时间', wake: '记录时间', workout: '记录时长', reading: '记录时长和页数', weight: '记录数值', footbath: '点击完成', dream: '记录梦境和 AI 解读',
       },
       habitNames: {
-        sleep: '睡眠', wake: '起床', workout: '运动', reading: '阅读', weight: '体重记录', footbath: '泡脚',
+        sleep: '睡眠', wake: '起床', workout: '运动', reading: '阅读', weight: '体重记录', footbath: '泡脚', dream: '梦境记录',
       },
     },
     en: {
@@ -207,7 +214,14 @@
       allRecords: 'All',
       readingRecords: 'Reading',
       workoutRecords: 'Workout',
+      dreamRecords: 'Dreams',
       habits: 'Habits',
+      settings: 'Settings',
+      modelSettings: 'Model settings',
+      aiModel: 'AI model',
+      localOnly: 'Stored on this device',
+      modelSettingsHint: 'Choose the default model for image analysis, reading reflections, titles, and dream interpretation.',
+      futureModels: 'More models and task-specific choices can be added later.',
       weeklyReview: 'Weekly review',
       planAndActual: 'Plan and actual',
       bedtime: 'Bedtime',
@@ -318,10 +332,10 @@
       dayNames: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
       metricLabels: { duration: 'duration', count: 'count', number: 'number', time: 'time' },
       trackingLabels: {
-        sleep: 'Track time', wake: 'Track time', workout: 'Track duration', reading: 'Track time and pages', weight: 'Track value', footbath: 'Tap to complete',
+        sleep: 'Track time', wake: 'Track time', workout: 'Track duration', reading: 'Track time and pages', weight: 'Track value', footbath: 'Tap to complete', dream: 'Record dream and AI interpretation',
       },
       habitNames: {
-        sleep: 'Sleep', wake: 'Wake up', workout: 'Workout', reading: 'Reading', weight: 'Weight log', footbath: 'Foot bath',
+        sleep: 'Sleep', wake: 'Wake up', workout: 'Workout', reading: 'Reading', weight: 'Weight log', footbath: 'Foot bath', dream: 'Dream journal',
       },
     },
   };
@@ -356,6 +370,11 @@
       id: 'footbath', icon: 'footbath', kind: 'boolean', recorded: false, complete: false,
       weekDone: 3, weekTarget: 4, frequency: { type: 'weekly', count: 4 }, recordOptions: { text: true, photo: false, voice: false },
       weekStates: ['complete', 'none', 'complete', 'none', 'complete', 'none', 'none'],
+    },
+    {
+      id: 'dream', icon: 'dream', kind: 'dream', recorded: false, complete: false,
+      weekDone: 0, weekTarget: 7, frequency: { type: 'daily' }, recordOptions: { text: true, photo: false, voice: false },
+      weekStates: ['none', 'none', 'none', 'none', 'none', 'none', 'none'],
     },
   ];
 
@@ -410,6 +429,7 @@
 
   const cloneInitialState = () => ({
     language: 'zh',
+    defaultAiModel: AI_MODELS[0].id,
     sampleDataVersion: 0,
     history: createSampleHistory(),
     records: createInitialRecords(),
@@ -478,6 +498,18 @@
           ...habit,
           recordOptions: habit.recordOptions || { text: false, photo: false, voice: false },
         }));
+        if (!parsed.habits.some((habit) => habit.id === 'dream')) {
+          const dreamHabit = initialHabits.find((habit) => habit.id === 'dream');
+          parsed.habits.push({
+            ...dreamHabit,
+            weekStates: [...dreamHabit.weekStates],
+            frequency: { ...dreamHabit.frequency },
+            recordOptions: { ...dreamHabit.recordOptions },
+          });
+        }
+        if (!AI_MODELS.some((model) => model.id === parsed.defaultAiModel)) {
+          parsed.defaultAiModel = AI_MODELS[0].id;
+        }
         if (!Array.isArray(parsed.records)) parsed.records = createInitialRecords();
         const migrated = applyRequestedSampleData(parsed);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
@@ -493,6 +525,7 @@
   let aiRecognitionResults = new Map();
   let readingSession = null;
   let pendingWorkoutSession = null;
+  let dreamSession = null;
   let recordFilter = 'all';
   let selectedIcon = 'sprout';
   let selectedFrequency = 'daily';
@@ -505,6 +538,7 @@
   const elements = {
     habitList: document.getElementById('habit-list'),
     managedHabitList: document.getElementById('managed-habit-list'),
+    modelSettingsList: document.getElementById('model-settings-list'),
     recordSections: document.getElementById('record-sections'),
     weekMatrix: document.getElementById('week-matrix'),
     sleepChart: document.getElementById('sleep-chart'),
@@ -537,6 +571,11 @@
     }
     if (habit.kind === 'weight') entry.value = habit.value;
     if (habit.kind === 'custom' && habit.quantified) entry.value = habit.value;
+    if (habit.kind === 'dream') {
+      entry.dreamText = details.dreamText || '';
+      entry.interpretation = details.interpretation || '';
+      entry.recordId = details.recordId || '';
+    }
     state.history[date][habit.id] = entry;
   };
   const ratio = (habit) => {
@@ -576,6 +615,9 @@
       const index = Number(key.slice(6)) || 0;
       return `<span class="fallback-icon-art color-only" style="--fallback-color:${fallbackColors[index % fallbackColors.length]}"></span>`;
     }
+    if (key === 'dream') {
+      return `<svg class="icon-art dream-icon-art" viewBox="0 0 64 64" role="img" aria-label="梦境"><path d="M12 42c0-8 6-14 14-14 3-9 16-10 21-2 8 0 12 5 12 11 0 8-7 13-15 13H24c-7 0-12-3-12-8Z" fill="#a9c9e8" stroke="#63391f" stroke-width="3.5" stroke-linejoin="round"/><path d="M31 9c-7 2-10 11-5 17 4 5 12 4 16 0-8 1-13-8-11-17Z" fill="#ffc14d" stroke="#63391f" stroke-width="3" stroke-linejoin="round"/><path d="m49 11 1.8 4.2L55 17l-4.2 1.8L49 23l-1.8-4.2L43 17l4.2-1.8L49 11Z" fill="#fff7dd" stroke="#63391f" stroke-width="2"/></svg>`;
+    }
     return `<img class="icon-art" src="./assets/icons/${key}.png?v=2" alt="">`;
   };
 
@@ -610,6 +652,14 @@
     if (habit.kind === 'weight') {
       const planned = state.language === 'zh' ? '每天记录' : 'daily log';
       return t().planActual(planned, Number.isFinite(todayEntry?.value) ? `${todayEntry.value} kg` : '—');
+    }
+    if (habit.kind === 'dream') {
+      return t().planActual(
+        state.language === 'zh' ? '每天记录' : 'daily log',
+        todayEntry?.status && todayEntry.status !== 'none'
+          ? state.language === 'zh' ? '打卡成功' : 'Check-in complete'
+          : '—',
+      );
     }
     if (habit.kind === 'custom' && habit.quantified) {
       const actual = todayEntry?.status && todayEntry.status !== 'none'
@@ -982,7 +1032,20 @@
     if (record.type === 'reading') {
       return `${record.metrics?.minutes || 0} 分钟 · ${record.metrics?.pages || 0} 页`;
     }
+    if (record.type === 'dream') return '梦境原文 · AI 解读';
     return `${record.metrics?.activityType || '运动'} · ${record.metrics?.minutes || 0} 分钟`;
+  };
+
+  const recordTypeLabel = (type) => {
+    if (type === 'reading') return t().readingRecords;
+    if (type === 'dream') return t().dreamRecords;
+    return t().workoutRecords;
+  };
+
+  const recordFallbackTitle = (record) => {
+    if (record.type === 'reading') return '阅读记录';
+    if (record.type === 'dream') return '梦境记录';
+    return '运动记录';
   };
 
   const recordImagesMarkup = (record, detail = false) => {
@@ -1014,9 +1077,9 @@
       <button class="record-entry" type="button" data-record-id="${escapeHtml(record.id)}">
         <span class="record-entry-date"><small>${date.month}</small><strong>${date.day}</strong><small>${date.weekday}</small></span>
         <span class="record-entry-copy">
-          <strong>${escapeHtml(record.title || (record.type === 'reading' ? '阅读记录' : '运动记录'))}</strong>
+          <strong>${escapeHtml(record.title || recordFallbackTitle(record))}</strong>
           <span>${escapeHtml(summary)}</span>
-          <small><i class="record-type-dot is-${record.type}"></i>${record.type === 'reading' ? '阅读' : '运动'} · ${escapeHtml(recordMetricText(record))}</small>
+          <small><i class="record-type-dot is-${record.type}"></i>${escapeHtml(recordTypeLabel(record.type))} · ${escapeHtml(recordMetricText(record))}</small>
         </span>
         ${recordImagesMarkup(record)}
       </button>
@@ -1029,15 +1092,17 @@
       button.classList.toggle('is-selected', selected);
       button.setAttribute('aria-pressed', String(selected));
     });
-    const types = recordFilter === 'all' ? ['reading', 'workout'] : [recordFilter];
+    const types = recordFilter === 'all' ? ['reading', 'workout', 'dream'] : [recordFilter];
     elements.recordSections.innerHTML = types.map((type) => {
       const records = state.records
         .filter((record) => record.type === type)
         .sort((first, second) => new Date(second.createdAt) - new Date(first.createdAt));
-      const label = type === 'reading' ? t().readingRecords : t().workoutRecords;
+      const label = recordTypeLabel(type);
       const description = type === 'reading'
         ? '摘录、当下感悟与心情记录'
-        : '锻炼、身体感受与结伴同行';
+        : type === 'dream'
+          ? '梦境、情绪与潜意识线索'
+          : '锻炼、身体感受与结伴同行';
       return `
         <section class="record-section">
           <header class="record-section-heading">
@@ -1073,7 +1138,7 @@
     activeHabitId = null;
     readingSession = null;
     pendingWorkoutSession = null;
-    document.getElementById('sheet-title').textContent = record.title || (record.type === 'reading' ? '阅读记录' : '运动记录');
+    document.getElementById('sheet-title').textContent = record.title || recordFallbackTitle(record);
     const saveButton = document.querySelector('#checkin-form > .save-button');
     saveButton.hidden = true;
     elements.result.textContent = '';
@@ -1081,8 +1146,9 @@
       <article class="record-detail">
         <p class="record-detail-date">${escapeHtml(date.full)} · ${escapeHtml(recordMetricText(record))}</p>
         ${recordImagesMarkup(record, true)}
-        ${record.summary ? `<section><h3>${record.type === 'reading' ? '我的感悟' : '身体感受'}</h3><p>${escapeHtml(record.summary)}</p></section>` : ''}
-        ${record.sourceText ? `<section><h3>${record.type === 'reading' ? '摘录原文' : '训练内容'}</h3><p class="record-detail-source">${escapeHtml(record.sourceText)}</p></section>` : ''}
+        ${record.summary ? `<section><h3>${record.type === 'reading' ? '我的感悟' : record.type === 'dream' ? 'AI 解读（已由用户确认）' : '身体感受'}</h3><p>${escapeHtml(record.summary)}</p></section>` : ''}
+        ${record.sourceText ? `<section><h3>${record.type === 'reading' ? '摘录原文' : record.type === 'dream' ? '我的梦境' : '训练内容'}</h3><p class="record-detail-source">${escapeHtml(record.sourceText)}</p></section>` : ''}
+        ${record.type === 'dream' ? '<p class="record-detail-note">AI 解读仅用于自我记录与联想，不代表诊断或预言。</p>' : ''}
       </article>
     `;
     elements.fields.onclick = (event) => {
@@ -1113,6 +1179,19 @@
         </div>
       </article>
     `).join('');
+  };
+
+  const renderModelSettings = () => {
+    elements.modelSettingsList.innerHTML = AI_MODELS.map((model) => {
+      const selected = state.defaultAiModel === model.id;
+      return `
+        <button class="model-setting-option ${selected ? 'is-selected' : ''}" type="button" data-default-ai-model="${model.id}" aria-pressed="${selected}">
+          <span class="model-setting-radio" aria-hidden="true"></span>
+          <span><strong>${state.language === 'zh' ? model.labelZh : model.labelEn}</strong><small>${model.id}</small></span>
+          <b>${selected ? (state.language === 'zh' ? '默认' : 'Default') : ''}</b>
+        </button>
+      `;
+    }).join('');
   };
 
   const renderCopy = () => {
@@ -1158,6 +1237,7 @@
     renderReview();
     renderRecords();
     renderManagedHabits();
+    renderModelSettings();
   };
 
   const openLayer = (layer) => {
@@ -1174,6 +1254,7 @@
     activeHabitId = null;
     readingSession = null;
     pendingWorkoutSession = null;
+    dreamSession = null;
   };
 
   const field = (label, input) => `<div class="field"><label>${label}</label>${input}</div>`;
@@ -1210,7 +1291,7 @@
             </div>
             <div class="ai-controls">
               <select id="ai-model" aria-label="${t().aiImageRecognition}">
-                ${AI_MODELS.map((model) => `<option value="${model.id}">${state.language === 'zh' ? model.labelZh : model.labelEn}</option>`).join('')}
+                ${AI_MODELS.map((model) => `<option value="${model.id}" ${state.defaultAiModel === model.id ? 'selected' : ''}>${state.language === 'zh' ? model.labelZh : model.labelEn}</option>`).join('')}
               </select>
               <button class="ai-recognize-button" id="ai-recognize-button" type="button">${t().recognizeImage}</button>
             </div>
@@ -1983,6 +2064,136 @@
     renderReadingStep();
   };
 
+  const fallbackDreamTitle = (dreamText) => {
+    const concise = String(dreamText || '').replace(/\s+/g, ' ').trim();
+    if (!concise) return '昨夜的梦境';
+    const opening = concise.split(/[。！？!?；;]/)[0].replace(/^我梦见/, '').trim();
+    return opening ? `梦见${opening}`.slice(0, 24) : '昨夜的梦境';
+  };
+
+  const renderDreamCheckin = () => {
+    const token = localStorage.getItem(AI_TOKEN_STORAGE_KEY) || '';
+    elements.fields.innerHTML = `
+      <div class="dream-flow">
+        <section class="dream-editor-card">
+          <div class="reading-section-head">
+            <div><strong>我的梦境</strong><small>写下记得的场景、人物、情绪或细节</small></div>
+          </div>
+          <textarea id="dream-text" class="dream-textarea" maxlength="8000" placeholder="我梦见……">${escapeHtml(dreamSession.dreamText)}</textarea>
+        </section>
+        <section class="dream-editor-card dream-ai-card">
+          <div class="reading-section-head">
+            <div><strong>AI 解读</strong><small>生成后可以继续修改，最终保存的是你确认的版本</small></div>
+            <button id="dream-interpret-button" type="button" ${dreamSession.loading ? 'disabled' : ''}>${dreamSession.loading ? '解读中…' : 'AI 解读梦境'}</button>
+          </div>
+          ${token ? '<p class="reading-connected">✓ AI 服务已连接</p>' : `
+            <label class="dream-token-label" for="dream-access-token">Bloom 测试密码</label>
+            <input id="dream-access-token" type="password" autocomplete="off" placeholder="只保存在这台设备">
+          `}
+          <select id="dream-model" aria-label="梦境解读模型">
+            ${AI_MODELS.map((model) => `<option value="${model.id}" ${dreamSession.model === model.id ? 'selected' : ''}>${state.language === 'zh' ? model.labelZh : model.labelEn}</option>`).join('')}
+          </select>
+          <textarea id="dream-interpretation" class="dream-textarea dream-interpretation" maxlength="5000" placeholder="点击“AI 解读梦境”生成初稿，也可以自己填写……">${escapeHtml(dreamSession.interpretation)}</textarea>
+          <p class="dream-ai-disclaimer">解读用于自我观察和联想，不代表心理诊断、事实判断或预言。</p>
+          <p class="reading-status" id="dream-status" aria-live="polite">${escapeHtml(dreamSession.status)}</p>
+        </section>
+        <section class="dream-future-card">
+          <span aria-hidden="true">✦</span>
+          <div><strong>梦境画面</strong><small>未来可让 AI 根据梦境生成一张专属图片；本次暂不上传或生成图片。</small></div>
+        </section>
+      </div>
+    `;
+    document.querySelector('#checkin-form > .save-button').textContent = '保存梦境记录';
+    document.getElementById('dream-text').addEventListener('input', (event) => { dreamSession.dreamText = event.target.value; });
+    document.getElementById('dream-interpretation').addEventListener('input', (event) => { dreamSession.interpretation = event.target.value; });
+    document.getElementById('dream-model').addEventListener('change', (event) => { dreamSession.model = event.target.value; });
+    document.getElementById('dream-interpret-button').addEventListener('click', runDreamInterpretation);
+  };
+
+  const runDreamInterpretation = async () => {
+    dreamSession.dreamText = document.getElementById('dream-text')?.value.trim() || dreamSession.dreamText;
+    dreamSession.interpretation = document.getElementById('dream-interpretation')?.value || dreamSession.interpretation;
+    dreamSession.model = document.getElementById('dream-model')?.value || dreamSession.model;
+    const tokenInput = document.getElementById('dream-access-token');
+    const token = tokenInput?.value.trim() || localStorage.getItem(AI_TOKEN_STORAGE_KEY) || '';
+    if (!dreamSession.dreamText) {
+      dreamSession.status = '请先写下梦境内容';
+      renderDreamCheckin();
+      document.getElementById('dream-text')?.focus();
+      return;
+    }
+    if (!token) {
+      dreamSession.status = '请先输入 Bloom 测试密码';
+      renderDreamCheckin();
+      document.getElementById('dream-access-token')?.focus();
+      return;
+    }
+    if (tokenInput) localStorage.setItem(AI_TOKEN_STORAGE_KEY, token);
+    dreamSession.loading = true;
+    dreamSession.status = 'AI 正在阅读完整梦境…';
+    renderDreamCheckin();
+    try {
+      const response = await fetch(`${AI_ENDPOINT}/api/dream/interpret`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Bloom-Access-Token': token },
+        body: JSON.stringify({ model: dreamSession.model, dreamText: dreamSession.dreamText }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+      dreamSession.interpretation = String(payload.interpretation || '').trim();
+      dreamSession.status = '已生成解读初稿，你可以继续修改';
+    } catch (error) {
+      dreamSession.status = `解读失败：${error.message}`;
+    } finally {
+      dreamSession.loading = false;
+      renderDreamCheckin();
+    }
+  };
+
+  const saveDreamRecord = (habit) => {
+    dreamSession.dreamText = document.getElementById('dream-text')?.value.trim() || dreamSession.dreamText.trim();
+    dreamSession.interpretation = document.getElementById('dream-interpretation')?.value.trim() || dreamSession.interpretation.trim();
+    if (!dreamSession.dreamText) {
+      dreamSession.status = '请先写下梦境内容';
+      renderDreamCheckin();
+      document.getElementById('dream-text')?.focus();
+      return;
+    }
+    const recordId = dreamSession.recordId || `dream-${Date.now()}`;
+    const wasComplete = habit.complete;
+    habit.recorded = true;
+    habit.complete = true;
+    if (!wasComplete) habit.weekDone = Math.min(habit.weekTarget, habit.weekDone + 1);
+    habit.weekStates[todayWeekIndex()] = 'complete';
+    const dreamRecord = {
+      id: recordId,
+      type: 'dream',
+      habitId: habit.id,
+      title: fallbackDreamTitle(dreamSession.dreamText),
+      summary: dreamSession.interpretation,
+      sourceText: dreamSession.dreamText,
+      images: [],
+      metrics: {},
+      createdAt: new Date().toISOString(),
+    };
+    const existingRecordIndex = state.records.findIndex((record) => record.id === recordId);
+    if (existingRecordIndex >= 0) {
+      dreamRecord.createdAt = state.records[existingRecordIndex].createdAt;
+      state.records.splice(existingRecordIndex, 1, dreamRecord);
+    } else {
+      state.records.unshift(dreamRecord);
+    }
+    recordTodayInHistory(habit, {
+      dreamText: dreamSession.dreamText,
+      interpretation: dreamSession.interpretation,
+      recordId,
+    });
+    persist();
+    closeLayers();
+    renderAll();
+    showToast('梦境已保存，可在“记录”中查看');
+  };
+
   const openCheckin = (habitId) => {
     const habit = state.habits.find((item) => item.id === habitId);
     const todayEntry = state.history?.[localDateKey(new Date())]?.[habitId];
@@ -1993,6 +2204,7 @@
     formSaveButton.hidden = false;
     formSaveButton.textContent = t().saveRecord;
     pendingWorkoutSession = null;
+    dreamSession = null;
     selectedCheckinImageDataUrl = '';
     aiRecognitionResults = new Map();
     document.getElementById('sheet-title').textContent = habitName(habit);
@@ -2049,12 +2261,24 @@
         titleRequested: false,
         minutes: todayEntry?.minutes ?? '',
         pages: todayEntry?.pages ?? '',
-        model: 'qwen3.7-plus',
+        model: state.defaultAiModel,
         loading: false,
         status: '',
       };
       openLayer(elements.sheet);
       setupReadingFlow();
+      return;
+    } else if (habit.kind === 'dream') {
+      dreamSession = {
+        dreamText: todayEntry?.dreamText || '',
+        interpretation: todayEntry?.interpretation || '',
+        recordId: todayEntry?.recordId || '',
+        model: state.defaultAiModel,
+        loading: false,
+        status: '',
+      };
+      openLayer(elements.sheet);
+      renderDreamCheckin();
       return;
     } else if (habit.kind === 'weight') {
       elements.fields.innerHTML = `${field(t().weight, `<input id="weight-value" type="number" min="1" step="0.1" value="${Number.isFinite(todayEntry?.value) ? todayEntry.value : ''}" required>`)}${optionalCheckinFields(habit)}`;
@@ -2147,7 +2371,7 @@
           sourceText: session.activityType,
           reflection: session.note,
           metrics: `${session.activityType}，${session.minutes} 分钟`,
-          model: 'qwen3.7-plus',
+          model: state.defaultAiModel,
         });
         if (title) session.title = title;
         session.titleStatus = '已生成标题，你仍可以修改';
@@ -2233,6 +2457,11 @@
 
   const saveCheckin = () => {
     const habit = state.habits.find((item) => item.id === activeHabitId);
+    if (!habit) return;
+    if (habit.kind === 'dream' && dreamSession) {
+      saveDreamRecord(habit);
+      return;
+    }
     if (habit?.kind === 'workout' && pendingWorkoutSession) {
       commitWorkoutCheckin(habit);
       return;
@@ -2498,6 +2727,15 @@
     if (!button) return;
     recordFilter = button.dataset.recordFilter;
     renderRecords();
+  });
+
+  elements.modelSettingsList.addEventListener('click', (event) => {
+    const option = event.target.closest('[data-default-ai-model]');
+    if (!option) return;
+    state.defaultAiModel = option.dataset.defaultAiModel;
+    persist();
+    renderModelSettings();
+    showToast(state.language === 'zh' ? '默认模型已更新' : 'Default model updated');
   });
 
   elements.recordSections.addEventListener('click', (event) => {
