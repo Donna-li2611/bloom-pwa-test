@@ -2228,10 +2228,10 @@
             <div><strong>AI 解读</strong><small>生成后可以继续修改，最终保存的是你确认的版本</small></div>
             <button id="dream-interpret-button" type="button" ${dreamSession.loading ? 'disabled' : ''}>${dreamSession.loading ? '解读中…' : 'AI 解读梦境'}</button>
           </div>
-          ${token ? '<p class="reading-connected">✓ AI 服务已配置</p>' : `
-            <label class="dream-token-label" for="dream-access-token">Bloom 测试密码</label>
-            <input id="dream-access-token" type="password" autocomplete="off" placeholder="只保存在这台设备">
-          `}
+          <label class="dream-token-label" for="dream-access-token">Bloom 测试密码</label>
+          ${token ? '<p class="reading-connected">✓ 已在这台设备保存测试密码</p>' : ''}
+          <input id="dream-access-token" type="password" autocomplete="off" placeholder="${token ? '留空继续使用；输入可更换密码' : '输入后只保存在这台设备'}">
+          ${token ? '<button id="dream-clear-token" class="secondary-button" type="button">清除已保存密码</button>' : ''}
           <select id="dream-model" aria-label="梦境解读模型">
             ${AI_MODELS.map((model) => `<option value="${model.id}" ${dreamSession.model === model.id ? 'selected' : ''}>${state.language === 'zh' ? model.labelZh : model.labelEn}</option>`).join('')}
           </select>
@@ -2250,6 +2250,12 @@
     document.getElementById('dream-interpretation').addEventListener('input', (event) => { dreamSession.interpretation = event.target.value; });
     document.getElementById('dream-model').addEventListener('change', (event) => { dreamSession.model = event.target.value; });
     document.getElementById('dream-interpret-button').addEventListener('click', runDreamInterpretation);
+    document.getElementById('dream-clear-token')?.addEventListener('click', () => {
+      localStorage.removeItem(AI_TOKEN_STORAGE_KEY);
+      dreamSession.status = '已清除旧密码，请重新输入当前测试密码';
+      renderDreamCheckin();
+      document.getElementById('dream-access-token')?.focus();
+    });
   };
 
   const runDreamInterpretation = async () => {
@@ -2283,6 +2289,10 @@
       const payload = await response.json().catch(() => ({}));
       if (response.status === 404) {
         throw new Error('梦境解读接口尚未部署，请更新阿里云函数代码');
+      }
+      if (response.status === 401) {
+        localStorage.removeItem(AI_TOKEN_STORAGE_KEY);
+        throw new Error('测试密码无效或已失效，请重新输入当前测试密码');
       }
       if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
       dreamSession.interpretation = String(payload.interpretation || '').trim();
