@@ -3159,7 +3159,7 @@
 
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(() => {
+      navigator.serviceWorker.register('./sw.js?v=25').catch(() => {
         // Offline caching is optional; Bloom remains usable online.
       });
     });
