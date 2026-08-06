@@ -2228,7 +2228,7 @@
             <div><strong>AI 解读</strong><small>生成后可以继续修改，最终保存的是你确认的版本</small></div>
             <button id="dream-interpret-button" type="button" ${dreamSession.loading ? 'disabled' : ''}>${dreamSession.loading ? '解读中…' : 'AI 解读梦境'}</button>
           </div>
-          ${token ? '<p class="reading-connected">✓ AI 服务已连接</p>' : `
+          ${token ? '<p class="reading-connected">✓ AI 服务已配置</p>' : `
             <label class="dream-token-label" for="dream-access-token">Bloom 测试密码</label>
             <input id="dream-access-token" type="password" autocomplete="off" placeholder="只保存在这台设备">
           `}
@@ -2281,6 +2281,9 @@
         body: JSON.stringify({ model: dreamSession.model, dreamText: dreamSession.dreamText }),
       });
       const payload = await response.json().catch(() => ({}));
+      if (response.status === 404) {
+        throw new Error('梦境解读接口尚未部署，请更新阿里云函数代码');
+      }
       if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
       dreamSession.interpretation = String(payload.interpretation || '').trim();
       dreamSession.status = '已生成解读初稿，你可以继续修改';
