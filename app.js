@@ -264,7 +264,7 @@
       otherActivity: '其他运动',
       otherActivityPlaceholder: '请输入运动类型',
       weight: '体重（kg）',
-      quality: '睡眠质量（可选）',
+      quality: '前一夜睡眠质量（可选）',
       qualityOptions: ['不记录', '很好', '还不错', '一般', '较差'],
       completedToday: '打卡成功',
       tapToComplete: '点击完成今天的打卡',
@@ -402,7 +402,7 @@
       otherActivity: 'Other activity',
       otherActivityPlaceholder: 'Enter an activity',
       weight: 'Weight (kg)',
-      quality: 'Sleep quality (optional)',
+      quality: 'Previous night’s sleep quality (optional)',
       qualityOptions: ['Do not record', 'Great', 'Good', 'Fair', 'Poor'],
       completedToday: 'Completed today',
       tapToComplete: 'Tap to complete today',
@@ -645,6 +645,11 @@
       }
       await loadMediaRecords(record.imageIds).catch(() => {});
     }
+    const wakeImageIds = Object.values(state.history || {}).flatMap((day) => {
+      const imageIds = day?.wake?.imageIds;
+      return Array.isArray(imageIds) ? imageIds : [];
+    });
+    await loadMediaRecords(wakeImageIds).catch(() => {});
     const latestReading = state.habits.find((habit) => habit.id === 'reading')?.latestReadingRecord;
     if (latestReading) {
       const matchingRecord = state.records.find((record) => record.id === latestReading.id);
@@ -683,7 +688,14 @@
     state.history[date] ||= {};
     const status = habit.complete ? 'complete' : habit.recorded ? 'recorded' : 'none';
     const entry = { status };
-    if (habit.kind === 'time') entry.value = habit.actual;
+    if (habit.kind === 'time') {
+      entry.value = habit.actual;
+      if (habit.id === 'wake') {
+        entry.sleepQuality = details.sleepQuality || '';
+        entry.images = Array.isArray(details.images) ? details.images : [];
+        entry.imageIds = Array.isArray(details.imageIds) ? details.imageIds : [];
+      }
+    }
     if (habit.kind === 'workout') {
       entry.minutes = details.minutes || 0;
       entry.activityType = details.activityType || '';
@@ -1621,6 +1633,23 @@
     }
   };
 
+  const setupWakeSupplementInputs = () => {
+    const photoInput = document.getElementById('wake-sleep-photo');
+    photoInput?.addEventListener('change', async () => {
+      const file = photoInput.files?.[0];
+      if (!file) return;
+      const preview = document.getElementById('wake-sleep-photo-preview');
+      preview.src = URL.createObjectURL(file);
+      preview.hidden = false;
+      try {
+        selectedCheckinImageDataUrl = await fileToCompressedDataUrl(file);
+      } catch {
+        selectedCheckinImageDataUrl = '';
+        elements.result.textContent = '图片读取失败，请重新选择';
+      }
+    });
+  };
+
   const readingModelOptions = () => AI_MODELS.map((model) => `
     <option value="${model.id}" ${readingSession.model === model.id ? 'selected' : ''}>${state.language === 'zh' ? model.labelZh : model.labelEn}</option>
   `).join('');
@@ -2228,10 +2257,10 @@
             <div><strong>AI 解读</strong><small>生成后可以继续修改，最终保存的是你确认的版本</small></div>
             <button id="dream-interpret-button" type="button" ${dreamSession.loading ? 'disabled' : ''}>${dreamSession.loading ? '解读中…' : 'AI 解读梦境'}</button>
           </div>
-          <label class="dream-token-label" for="dream-access-token">Bloom 测试密码</label>
-          ${token ? '<p class="reading-connected">✓ 已在这台设备保存测试密码</p>' : ''}
-          <input id="dream-access-token" type="password" autocomplete="off" placeholder="${token ? '留空继续使用；输入可更换密码' : '输入后只保存在这台设备'}">
-          ${token ? '<button id="dream-clear-token" class="secondary-button" type="button">清除已保存密码</button>' : ''}
+          ${token ? '' : `
+            <label class="dream-token-label" for="dream-access-token">Bloom 测试密码</label>
+            <input id="dream-access-token" type="password" autocomplete="off" placeholder="输入后只保存在这台设备">
+          `}
           <select id="dream-model" aria-label="梦境解读模型">
             ${AI_MODELS.map((model) => `<option value="${model.id}" ${dreamSession.model === model.id ? 'selected' : ''}>${state.language === 'zh' ? model.labelZh : model.labelEn}</option>`).join('')}
           </select>
@@ -2250,12 +2279,6 @@
     document.getElementById('dream-interpretation').addEventListener('input', (event) => { dreamSession.interpretation = event.target.value; });
     document.getElementById('dream-model').addEventListener('change', (event) => { dreamSession.model = event.target.value; });
     document.getElementById('dream-interpret-button').addEventListener('click', runDreamInterpretation);
-    document.getElementById('dream-clear-token')?.addEventListener('click', () => {
-      localStorage.removeItem(AI_TOKEN_STORAGE_KEY);
-      dreamSession.status = '已清除旧密码，请重新输入当前测试密码';
-      renderDreamCheckin();
-      document.getElementById('dream-access-token')?.focus();
-    });
   };
 
   const runDreamInterpretation = async () => {
@@ -2380,10 +2403,25 @@
     }
 
     if (habit.kind === 'time') {
+      const wakeImage = habit.id === 'wake'
+        ? todayEntry?.images?.[0] || mediaUrlCache.get(todayEntry?.imageIds?.[0]) || ''
+        : '';
+      if (wakeImage) selectedCheckinImageDataUrl = wakeImage;
       elements.fields.innerHTML = `
         ${field(t().timeLabel, `<input id="checkin-time" type="time" value="${todayEntry?.value || ''}" required>`)}
         <p class="plan-note">${t().plannedTime(habit.target)}</p>
-        ${habit.id === 'sleep' ? field(t().quality, `<select id="sleep-quality">${t().qualityOptions.map((option) => `<option>${option}</option>`).join('')}</select>`) : ''}
+        ${habit.id === 'wake' ? `
+          <section class="wake-sleep-supplement">
+            <label for="wake-sleep-quality">${t().quality}</label>
+            <textarea id="wake-sleep-quality" rows="3" placeholder="可以写下感受，也可以留空">${escapeHtml(todayEntry?.sleepQuality || '')}</textarea>
+            <div class="wake-photo-row">
+              <label class="attachment-button" for="wake-sleep-photo">▧ 上传图片（可选）</label>
+              <input id="wake-sleep-photo" type="file" accept="image/*" hidden>
+              <span>不填写也不影响起床打卡</span>
+            </div>
+            <img class="attachment-preview" id="wake-sleep-photo-preview" src="${escapeHtml(wakeImage)}" alt="前一夜睡眠记录图片" ${wakeImage ? '' : 'hidden'}>
+          </section>
+        ` : ''}
         ${optionalCheckinFields(habit)}
       `;
     } else if (habit.kind === 'workout') {
@@ -2470,6 +2508,7 @@
     }
     openLayer(elements.sheet);
     setupOptionalInputs(habit);
+    if (habit.id === 'wake') setupWakeSupplementInputs();
     if (habit.kind === 'workout') {
       const activitySelect = document.getElementById('activity-type');
       const otherField = document.getElementById('other-activity-field');
@@ -2630,11 +2669,31 @@
       return;
     }
     const wasComplete = habit.complete;
+    let historyDetails = {};
 
     if (habit.kind === 'time') {
       habit.actual = document.getElementById('checkin-time').value;
       habit.recorded = true;
       habit.complete = habit.id === 'sleep' ? habit.actual <= habit.target : habit.actual <= habit.target;
+      if (habit.id === 'wake') {
+        const currentEntry = state.history?.[localDateKey(new Date())]?.wake;
+        let storedMedia = {
+          images: Array.isArray(currentEntry?.images) ? currentEntry.images : [],
+          imageIds: Array.isArray(currentEntry?.imageIds) ? currentEntry.imageIds : [],
+        };
+        if (selectedCheckinImageDataUrl) {
+          storedMedia = await persistRecordImages(
+            `wake-${localDateKey(new Date())}`,
+            'wake',
+            [selectedCheckinImageDataUrl],
+          );
+        }
+        historyDetails = {
+          sleepQuality: document.getElementById('wake-sleep-quality')?.value.trim() || '',
+          images: storedMedia.images,
+          imageIds: storedMedia.imageIds,
+        };
+      }
     } else if (habit.kind === 'workout') {
       const minutes = Number(document.getElementById('workout-minutes').value);
       const activityType = selectedWorkoutActivity();
@@ -2689,7 +2748,7 @@
         minutes: Number(document.getElementById('workout-minutes')?.value) || 0,
         activityType: selectedWorkoutActivity(),
       }
-      : {});
+      : historyDetails);
     persist();
     closeLayers();
     renderAll();
@@ -3159,7 +3218,7 @@
 
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=25').catch(() => {
+      navigator.serviceWorker.register('./sw.js?v=26').catch(() => {
         // Offline caching is optional; Bloom remains usable online.
       });
     });

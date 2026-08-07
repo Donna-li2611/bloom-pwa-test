@@ -2095,6 +2095,45 @@ h2 {
   font-weight: 800;
 }
 
+.wake-sleep-supplement {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface-soft);
+}
+
+.wake-sleep-supplement > label {
+  font-weight: 800;
+}
+
+.wake-sleep-supplement textarea {
+  width: 100%;
+  min-height: 92px;
+  padding: 12px 14px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  color: var(--text);
+  background: white;
+  font: inherit;
+  line-height: 1.55;
+}
+
+.wake-photo-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.wake-photo-row > span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 .dream-ai-card > input,
 .dream-ai-card > select {
   width: 100%;
