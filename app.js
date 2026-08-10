@@ -8,6 +8,60 @@
     { id: 'qwen3.7-plus', labelZh: '3.7 · 效果优先', labelEn: '3.7 · Best quality' },
     { id: 'qwen3.5-plus-2026-04-20', labelZh: '3.5 · 成本优先', labelEn: '3.5 · Lower cost' },
   ];
+  const HABIT_TRANSLATIONS = [
+    ['sleep', '睡眠', 'Sleep', ['早睡', '按时睡觉', 'go to bed early', 'bedtime']],
+    ['wake_up', '起床', 'Wake up', ['早起', '按时起床', 'wake up early']],
+    ['workout', '运动', 'Workout', ['健身', '锻炼', '训练', 'exercise', 'fitness']],
+    ['reading', '阅读', 'Reading', ['看书', '读书', 'read']],
+    ['weight', '体重记录', 'Weight tracking', ['记录体重', '称体重', 'track weight']],
+    ['foot_bath', '泡脚', 'Foot soak', ['足浴', 'foot bath']],
+    ['dream_journal', '梦境记录', 'Dream journal', ['记梦', '记录梦境', 'dream log']],
+    ['running', '跑步', 'Running', ['晨跑', '夜跑', 'run']],
+    ['walking', '散步', 'Walking', ['走路', '快走', 'walk']],
+    ['cycling', '骑单车', 'Cycling', ['骑车', '自行车', 'bike']],
+    ['swimming', '游泳', 'Swimming', ['swim']],
+    ['yoga', '瑜伽', 'Yoga', []],
+    ['stretching', '拉伸', 'Stretching', ['伸展', 'stretch']],
+    ['strength_training', '力量训练', 'Strength training', ['撸铁', 'weight training']],
+    ['badminton', '羽毛球', 'Badminton', []],
+    ['table_tennis', '乒乓球', 'Table tennis', ['ping pong']],
+    ['golf', '高尔夫', 'Golf', []],
+    ['meditation', '冥想', 'Meditation', ['正念', 'meditate', 'mindfulness']],
+    ['study', '学习', 'Study', ['专注学习', 'learn']],
+    ['vocabulary', '背单词', 'Vocabulary', ['记单词', 'learn vocabulary']],
+    ['english', '学英语', 'Learn English', ['英语学习', 'study english']],
+    ['writing', '写作', 'Writing', ['write']],
+    ['journaling', '写日记', 'Journaling', ['记日记', 'journal']],
+    ['reflection', '每日复盘', 'Daily reflection', ['复盘', 'reflection']],
+    ['drink_water', '喝水', 'Drink water', ['饮水', 'drink water']],
+    ['healthy_eating', '健康饮食', 'Healthy eating', ['控制饮食', 'eat healthy']],
+    ['take_medication', '服药', 'Take medication', ['吃药', 'take medicine']],
+    ['vitamins', '吃维生素', 'Take vitamins', ['维生素', 'vitamins']],
+    ['sleep_tracking', '记录睡眠', 'Track sleep', ['睡眠记录', 'sleep log']],
+    ['tidy_up', '整理房间', 'Tidy up', ['收拾房间', 'clean room']],
+    ['skincare', '护肤', 'Skincare', ['skin care']],
+    ['brush_teeth', '刷牙', 'Brush teeth', ['brush my teeth']],
+    ['daily_planning', '今日计划', 'Daily planning', ['每日计划', 'daily plan']],
+    ['expense_tracking', '记账', 'Expense tracking', ['记录开支', 'track expenses']],
+    ['mood_journal', '心情记录', 'Mood journal', ['记录心情', 'mood log']],
+    ['gratitude', '感恩记录', 'Gratitude journal', ['感恩日记', 'gratitude journal']],
+  ].map(([key, zh, en, aliases]) => ({ key, zh, en, aliases }));
+  const normalizeHabitText = (value) => String(value || '').trim().toLocaleLowerCase().replace(/[\s_-]+/g, ' ');
+  const resolveHabitTranslation = (name) => {
+    const normalized = normalizeHabitText(name);
+    const exactMatch = HABIT_TRANSLATIONS.find((item) => [item.zh, item.en, ...item.aliases]
+      .some((candidate) => normalizeHabitText(candidate) === normalized));
+    if (exactMatch) return exactMatch;
+    const keywordMatches = HABIT_TRANSLATIONS.flatMap((item) => [item.zh, item.en, ...item.aliases]
+      .map((candidate) => ({ item, keyword: normalizeHabitText(candidate) })))
+      .filter(({ keyword }) => keyword.length > 1 && normalized.includes(keyword))
+      .sort((left, right) => right.keyword.length - left.keyword.length);
+    return keywordMatches[0]?.item;
+  };
+  const defaultHabitKeyById = {
+    sleep: 'sleep', wake: 'wake_up', workout: 'workout', reading: 'reading',
+    weight: 'weight', footbath: 'foot_bath', dream: 'dream_journal',
+  };
   const weekdayKeys = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
   const bedtimeHistory = ['23:18', '23:42', '23:25', '23:08', '23:51', '23:22', '23:42'];
   const wakeHistory = ['06:54', '07:12', '06:48', '06:58', '07:18', '06:51', '06:52'];
@@ -95,6 +149,12 @@
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  };
+
+  const dateFromKey = (value) => {
+    const [year, month, day] = String(value).split('-').map(Number);
+    if (!year || !month || !day) return new Date();
+    return new Date(year, month - 1, day, 12);
   };
 
   const sampleHistoryRows = [
@@ -264,8 +324,6 @@
       otherActivity: '其他运动',
       otherActivityPlaceholder: '请输入运动类型',
       weight: '体重（kg）',
-      quality: '前一夜睡眠质量（可选）',
-      qualityOptions: ['不记录', '很好', '还不错', '一般', '较差'],
       completedToday: '打卡成功',
       tapToComplete: '点击完成今天的打卡',
       mon: '一', tue: '二', wed: '三', thu: '四', fri: '五', sat: '六', sun: '日',
@@ -402,8 +460,6 @@
       otherActivity: 'Other activity',
       otherActivityPlaceholder: 'Enter an activity',
       weight: 'Weight (kg)',
-      quality: 'Previous night’s sleep quality (optional)',
-      qualityOptions: ['Do not record', 'Great', 'Good', 'Fair', 'Poor'],
       completedToday: 'Completed today',
       tapToComplete: 'Tap to complete today',
       mon: 'M', tue: 'T', wed: 'W', thu: 'T', fri: 'F', sat: 'S', sun: 'S',
@@ -509,17 +565,23 @@
     sampleDataVersion: 0,
     history: createSampleHistory(),
     records: createInitialRecords(),
-    habits: initialHabits.map((habit) => ({
-      ...habit,
-      weekStates: [...habit.weekStates],
-      frequency: { ...habit.frequency },
-      recordOptions: { ...habit.recordOptions },
-    })),
+    habits: initialHabits.map((habit) => {
+      const habitKey = defaultHabitKeyById[habit.id] || habit.id;
+      const translation = HABIT_TRANSLATIONS.find((item) => item.key === habitKey);
+      return {
+        ...habit,
+        habitKey,
+        nameZh: translation?.zh || '',
+        nameEn: translation?.en || '',
+        weekStates: [...habit.weekStates],
+        frequency: { ...habit.frequency },
+        recordOptions: { ...habit.recordOptions },
+      };
+    }),
   });
 
-  const currentWeekDateKeys = () => {
-    const today = new Date();
-    const monday = new Date(today);
+  const weekDateKeysFor = (referenceDate) => {
+    const monday = new Date(referenceDate);
     const day = monday.getDay() || 7;
     monday.setDate(monday.getDate() - day + 1);
     return Array.from({ length: 7 }, (_, index) => {
@@ -528,6 +590,8 @@
       return localDateKey(date);
     });
   };
+
+  const currentWeekDateKeys = () => weekDateKeysFor(new Date());
 
   const applyRequestedSampleData = (loadedState) => {
     if (loadedState.sampleDataVersion >= SAMPLE_DATA_VERSION) return loadedState;
@@ -586,14 +650,27 @@
     try {
       const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY));
       if (parsed?.habits?.length) {
-        parsed.habits = parsed.habits.map((habit) => ({
-          ...habit,
-          recordOptions: habit.recordOptions || { text: false, photo: false, voice: false },
-        }));
+        parsed.habits = parsed.habits.map((habit) => {
+          const habitKey = habit.habitKey || defaultHabitKeyById[habit.id] || habit.id;
+          const translation = resolveHabitTranslation(habit.sourceName || habit.name)
+            || HABIT_TRANSLATIONS.find((item) => item.key === habitKey);
+          return {
+            ...habit,
+            habitKey: translation?.key || habitKey,
+            sourceName: habit.sourceName || habit.name || '',
+            nameZh: habit.nameZh || translation?.zh || '',
+            nameEn: habit.nameEn || translation?.en || '',
+            recordOptions: habit.recordOptions || { text: false, photo: false, voice: false },
+          };
+        });
         if (!parsed.habits.some((habit) => habit.id === 'dream')) {
           const dreamHabit = initialHabits.find((habit) => habit.id === 'dream');
+          const dreamTranslation = HABIT_TRANSLATIONS.find((item) => item.key === 'dream_journal');
           parsed.habits.push({
             ...dreamHabit,
+            habitKey: 'dream_journal',
+            nameZh: dreamTranslation?.zh || '梦境记录',
+            nameEn: dreamTranslation?.en || 'Dream journal',
             weekStates: [...dreamHabit.weekStates],
             frequency: { ...dreamHabit.frequency },
             recordOptions: { ...dreamHabit.recordOptions },
@@ -615,6 +692,7 @@
   };
 
   let state = loadState();
+  let selectedTodayDate = new Date();
   let activeHabitId = null;
   let selectedCheckinImageDataUrl = '';
   let aiRecognitionResults = new Map();
@@ -645,11 +723,6 @@
       }
       await loadMediaRecords(record.imageIds).catch(() => {});
     }
-    const wakeImageIds = Object.values(state.history || {}).flatMap((day) => {
-      const imageIds = day?.wake?.imageIds;
-      return Array.isArray(imageIds) ? imageIds : [];
-    });
-    await loadMediaRecords(wakeImageIds).catch(() => {});
     const latestReading = state.habits.find((habit) => habit.id === 'reading')?.latestReadingRecord;
     if (latestReading) {
       const matchingRecord = state.records.find((record) => record.id === latestReading.id);
@@ -681,20 +754,22 @@
 
   const t = () => copy[state.language];
   const persist = () => localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  const todayWeekIndex = () => (new Date().getDay() + 6) % 7;
+  const selectedDateKey = () => localDateKey(selectedTodayDate);
+  const todayWeekIndex = () => (selectedTodayDate.getDay() + 6) % 7;
+  const selectedRecordTimestamp = () => {
+    const timestamp = new Date(selectedTodayDate);
+    const now = new Date();
+    timestamp.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+    return timestamp.toISOString();
+  };
   const recordTodayInHistory = (habit, details = {}) => {
-    const date = localDateKey(new Date());
+    const date = selectedDateKey();
     state.history ||= {};
     state.history[date] ||= {};
     const status = habit.complete ? 'complete' : habit.recorded ? 'recorded' : 'none';
     const entry = { status };
     if (habit.kind === 'time') {
       entry.value = habit.actual;
-      if (habit.id === 'wake') {
-        entry.sleepQuality = details.sleepQuality || '';
-        entry.images = Array.isArray(details.images) ? details.images : [];
-        entry.imageIds = Array.isArray(details.imageIds) ? details.imageIds : [];
-      }
     }
     if (habit.kind === 'workout') {
       entry.minutes = details.minutes || 0;
@@ -717,7 +792,10 @@
     const progress = currentWeekProgress(habit);
     return Math.min(1, progress.complete / Math.max(1, progress.target));
   };
-  const habitName = (habit) => habit.name || t().habitNames[habit.id] || '';
+  const habitName = (habit) => {
+    const localizedName = state.language === 'zh' ? habit.nameZh : habit.nameEn;
+    return localizedName || habit.sourceName || habit.name || t().habitNames[habit.id] || '';
+  };
   const legacyIcons = {
     '🌙': 'sleep', '🌅': 'wake', '☀️': 'wake', '🏃': 'workout', '📖': 'reading',
     '⚖️': 'weight', '🛁': 'footbath', '🧘': 'meditation', '💧': 'water', '🌱': 'sprout',
@@ -766,7 +844,7 @@
   const formatValueWithUnit = (value, unit) => unit ? `${value} ${unit}` : String(value);
 
   const habitDetail = (habit) => {
-    const todayEntry = state.history?.[localDateKey(new Date())]?.[habit.id];
+    const todayEntry = state.history?.[selectedDateKey()]?.[habit.id];
     if (habit.kind === 'time') return t().planActual(habit.target, todayEntry?.value || habit.actual || '—');
     if (habit.kind === 'workout') {
       const unit = state.language === 'zh' ? '分钟' : 'min';
@@ -871,11 +949,14 @@
   };
 
   const syncTodayHabitState = () => {
-    const today = localDateKey(new Date());
+    const today = selectedDateKey();
     const entries = state.history?.[today] || {};
+    const selectedWeekKeys = weekDateKeysFor(selectedTodayDate);
     state.habits.forEach((habit) => {
       const entry = entries[habit.id];
       const status = historyStatus(today, habit.id);
+      habit.weekStates = selectedWeekKeys.map((date) => historyStatus(date, habit.id));
+      habit.weekDone = habit.weekStates.filter((weekStatus) => weekStatus === 'complete').length;
       habit.recorded = status !== 'none';
       habit.complete = status === 'complete';
       if (habit.kind === 'time') habit.actual = entry?.value || '';
@@ -886,11 +967,12 @@
       if (habit.kind === 'custom' && habit.quantified) {
         habit.value = entry?.value ?? '';
       }
+      if (habit.kind === 'weight') habit.value = entry?.value ?? '';
     });
   };
 
   const currentWeekProgress = (habit) => {
-    const statuses = currentWeekDateKeys().map((date) => historyStatus(date, habit.id));
+    const statuses = weekDateKeysFor(selectedTodayDate).map((date) => historyStatus(date, habit.id));
     return {
       recorded: statuses.filter((status) => status !== 'none').length,
       complete: statuses.filter((status) => status === 'complete').length,
@@ -1365,6 +1447,20 @@
       ? { month: 'long', day: 'numeric', weekday: 'long' }
       : { month: 'long', day: 'numeric', weekday: 'long' };
     document.getElementById('today-date').textContent = new Intl.DateTimeFormat(state.language === 'zh' ? 'zh-CN' : 'en-US', options).format(new Date());
+    const selectedKey = selectedDateKey();
+    const actualTodayKey = localDateKey(new Date());
+    const isToday = selectedKey === actualTodayKey;
+    const selectedLabel = new Intl.DateTimeFormat(state.language === 'zh' ? 'zh-CN' : 'en-US', {
+      month: 'numeric', day: 'numeric', ...(isToday ? {} : { weekday: 'short' }),
+    }).format(selectedTodayDate);
+    document.getElementById('habit-heading').textContent = isToday
+      ? t().today
+      : state.language === 'zh' ? '补打卡' : 'Backfill';
+    document.getElementById('today-selected-date').textContent = selectedLabel;
+    const dateInput = document.getElementById('today-date-input');
+    dateInput.value = selectedKey;
+    dateInput.max = actualTodayKey;
+    document.getElementById('next-today-date').disabled = selectedKey >= actualTodayKey;
     const quotes = state.language === 'zh'
       ? ['慢慢来，你正在成为自己喜欢的样子。', '每一次真实记录，都是在认真照顾自己。', '今天不必完美，只需要继续。']
       : ['Take your time. You are becoming someone you like.', 'Every honest record is a way of caring for yourself.', 'Today does not need to be perfect. Just keep going.'];
@@ -1380,6 +1476,13 @@
     renderRecords();
     renderManagedHabits();
     renderModelSettings();
+  };
+
+  const selectTodayDate = (date) => {
+    const actualToday = dateFromKey(localDateKey(new Date()));
+    selectedTodayDate = date > actualToday ? actualToday : date;
+    closeLayers();
+    renderAll();
   };
 
   const openLayer = (layer) => {
@@ -1633,23 +1736,6 @@
     }
   };
 
-  const setupWakeSupplementInputs = () => {
-    const photoInput = document.getElementById('wake-sleep-photo');
-    photoInput?.addEventListener('change', async () => {
-      const file = photoInput.files?.[0];
-      if (!file) return;
-      const preview = document.getElementById('wake-sleep-photo-preview');
-      preview.src = URL.createObjectURL(file);
-      preview.hidden = false;
-      try {
-        selectedCheckinImageDataUrl = await fileToCompressedDataUrl(file);
-      } catch {
-        selectedCheckinImageDataUrl = '';
-        elements.result.textContent = '图片读取失败，请重新选择';
-      }
-    });
-  };
-
   const readingModelOptions = () => AI_MODELS.map((model) => `
     <option value="${model.id}" ${readingSession.model === model.id ? 'selected' : ''}>${state.language === 'zh' ? model.labelZh : model.labelEn}</option>
   `).join('');
@@ -1901,7 +1987,7 @@
         `}
         <section class="reading-panel">
           <div class="reading-section-head">
-            <div><strong>${saved ? escapeHtml(readingSession.title) : '阅读记录预览'}</strong><small>${saved ? new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric' }).format(new Date()) : '标题、图片、原文与感悟将作为同一条记录保存'}</small></div>
+            <div><strong>${saved ? escapeHtml(readingSession.title) : '阅读记录预览'}</strong><small>${saved ? new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric' }).format(selectedTodayDate) : '标题、图片、原文与感悟将作为同一条记录保存'}</small></div>
             <span>${saved ? '已保存' : '未保存'}</span>
           </div>
           <div class="reading-record-section">
@@ -2043,7 +2129,7 @@
       readingSession.reflection,
     );
     const previousRecords = [...state.records];
-    const todayKey = localDateKey(new Date());
+    const todayKey = selectedDateKey();
     const previousTodayHistory = state.history?.[todayKey]?.[habit.id]
       ? { ...state.history[todayKey][habit.id] }
       : null;
@@ -2069,7 +2155,7 @@
     habit.complete = habit.minutes >= habit.target;
     habit.latestReadingRecord = {
       id: recordId,
-      createdAt: new Date().toISOString(),
+      createdAt: selectedRecordTimestamp(),
       title: readingSession.title,
       images: storedMedia.images,
       imageIds: storedMedia.imageIds,
@@ -2355,7 +2441,7 @@
       images: existingRecord?.images || [],
       imageIds: existingRecord?.imageIds || [],
       metrics: {},
-      createdAt: new Date().toISOString(),
+      createdAt: selectedRecordTimestamp(),
     };
     if (existingRecordIndex >= 0) {
       dreamRecord.createdAt = state.records[existingRecordIndex].createdAt;
@@ -2376,7 +2462,7 @@
 
   const openCheckin = (habitId) => {
     const habit = state.habits.find((item) => item.id === habitId);
-    const todayEntry = state.history?.[localDateKey(new Date())]?.[habitId];
+    const todayEntry = state.history?.[selectedDateKey()]?.[habitId];
     activeHabitId = habitId;
     elements.fields.onclick = null;
     elements.fields.onchange = null;
@@ -2387,7 +2473,13 @@
     dreamSession = null;
     selectedCheckinImageDataUrl = '';
     aiRecognitionResults = new Map();
-    document.getElementById('sheet-title').textContent = habitName(habit);
+    const isCurrentDate = selectedDateKey() === localDateKey(new Date());
+    const checkinDateLabel = new Intl.DateTimeFormat(state.language === 'zh' ? 'zh-CN' : 'en-US', {
+      month: 'numeric', day: 'numeric',
+    }).format(selectedTodayDate);
+    document.getElementById('sheet-title').textContent = isCurrentDate
+      ? habitName(habit)
+      : `${habitName(habit)} · ${checkinDateLabel}`;
     elements.result.textContent = '';
 
     if (habit.kind === 'boolean' && !hasOptionalContent(habit)) {
@@ -2403,25 +2495,9 @@
     }
 
     if (habit.kind === 'time') {
-      const wakeImage = habit.id === 'wake'
-        ? todayEntry?.images?.[0] || mediaUrlCache.get(todayEntry?.imageIds?.[0]) || ''
-        : '';
-      if (wakeImage) selectedCheckinImageDataUrl = wakeImage;
       elements.fields.innerHTML = `
         ${field(t().timeLabel, `<input id="checkin-time" type="time" value="${todayEntry?.value || ''}" required>`)}
         <p class="plan-note">${t().plannedTime(habit.target)}</p>
-        ${habit.id === 'wake' ? `
-          <section class="wake-sleep-supplement">
-            <label for="wake-sleep-quality">${t().quality}</label>
-            <textarea id="wake-sleep-quality" rows="3" placeholder="可以写下感受，也可以留空">${escapeHtml(todayEntry?.sleepQuality || '')}</textarea>
-            <div class="wake-photo-row">
-              <label class="attachment-button" for="wake-sleep-photo">▧ 上传图片（可选）</label>
-              <input id="wake-sleep-photo" type="file" accept="image/*" hidden>
-              <span>不填写也不影响起床打卡</span>
-            </div>
-            <img class="attachment-preview" id="wake-sleep-photo-preview" src="${escapeHtml(wakeImage)}" alt="前一夜睡眠记录图片" ${wakeImage ? '' : 'hidden'}>
-          </section>
-        ` : ''}
         ${optionalCheckinFields(habit)}
       `;
     } else if (habit.kind === 'workout') {
@@ -2508,7 +2584,6 @@
     }
     openLayer(elements.sheet);
     setupOptionalInputs(habit);
-    if (habit.id === 'wake') setupWakeSupplementInputs();
     if (habit.kind === 'workout') {
       const activitySelect = document.getElementById('activity-type');
       const otherField = document.getElementById('other-activity-field');
@@ -2587,7 +2662,7 @@
     session.title = session.title || fallbackRecordTitle('workout', session.activityType, session.note, session.activityType);
     const wasComplete = habit.complete;
     const previousRecords = [...state.records];
-    const todayKey = localDateKey(new Date());
+    const todayKey = selectedDateKey();
     const previousTodayHistory = state.history?.[todayKey]?.[habit.id]
       ? { ...state.history[todayKey][habit.id] }
       : null;
@@ -2624,7 +2699,7 @@
       images: storedMedia.images,
       imageIds: storedMedia.imageIds,
       metrics: { minutes: session.minutes, activityType: session.activityType },
-      createdAt: new Date().toISOString(),
+      createdAt: selectedRecordTimestamp(),
     });
     try {
       persist();
@@ -2675,25 +2750,6 @@
       habit.actual = document.getElementById('checkin-time').value;
       habit.recorded = true;
       habit.complete = habit.id === 'sleep' ? habit.actual <= habit.target : habit.actual <= habit.target;
-      if (habit.id === 'wake') {
-        const currentEntry = state.history?.[localDateKey(new Date())]?.wake;
-        let storedMedia = {
-          images: Array.isArray(currentEntry?.images) ? currentEntry.images : [],
-          imageIds: Array.isArray(currentEntry?.imageIds) ? currentEntry.imageIds : [],
-        };
-        if (selectedCheckinImageDataUrl) {
-          storedMedia = await persistRecordImages(
-            `wake-${localDateKey(new Date())}`,
-            'wake',
-            [selectedCheckinImageDataUrl],
-          );
-        }
-        historyDetails = {
-          sleepQuality: document.getElementById('wake-sleep-quality')?.value.trim() || '',
-          images: storedMedia.images,
-          imageIds: storedMedia.imageIds,
-        };
-      }
     } else if (habit.kind === 'workout') {
       const minutes = Number(document.getElementById('workout-minutes').value);
       const activityType = selectedWorkoutActivity();
@@ -2884,6 +2940,8 @@
 
   const saveHabit = () => {
     const name = document.getElementById('habit-name').value.trim();
+    const translation = resolveHabitTranslation(name);
+    const sourceLanguage = /[\u3400-\u9fff]/.test(name) ? 'zh' : 'en';
     const quantified = document.getElementById('quantify-toggle').checked;
     const metricType = document.getElementById('metric-type').value;
     const targetRaw = document.getElementById('habit-target').value;
@@ -2910,6 +2968,11 @@
     const existing = state.habits.find((habit) => habit.id === editingId);
     if (existing) {
       existing.name = name;
+      existing.sourceName = name;
+      existing.sourceLanguage = sourceLanguage;
+      existing.habitKey = translation?.key || existing.habitKey || existing.id;
+      existing.nameZh = translation?.zh || (sourceLanguage === 'zh' ? name : '');
+      existing.nameEn = translation?.en || (sourceLanguage === 'en' ? name : '');
       existing.icon = selectedIcon;
       existing.frequency = frequency;
       existing.weekTarget = weekTarget;
@@ -2924,8 +2987,12 @@
       }
       showToast(t().habitUpdated);
     } else {
+      const id = `custom-${Date.now()}`;
       state.habits.push({
-        id: `custom-${Date.now()}`, name, icon: selectedIcon, kind: 'custom', quantified, metricType, target, unit,
+        id, name, sourceName: name, sourceLanguage, habitKey: translation?.key || id,
+        nameZh: translation?.zh || (sourceLanguage === 'zh' ? name : ''),
+        nameEn: translation?.en || (sourceLanguage === 'en' ? name : ''),
+        icon: selectedIcon, kind: 'custom', quantified, metricType, target, unit,
         value: 0, recorded: false, complete: false, weekDone: 0, weekTarget, frequency, recordOptions,
         weekStates: ['none', 'none', 'none', 'none', 'none', 'none', 'none'],
       });
@@ -2982,6 +3049,22 @@
     state.language = state.language === 'zh' ? 'en' : 'zh';
     persist();
     renderAll();
+  });
+
+  document.getElementById('previous-today-date').addEventListener('click', () => {
+    const previousDate = new Date(selectedTodayDate);
+    previousDate.setDate(previousDate.getDate() - 1);
+    selectTodayDate(previousDate);
+  });
+
+  document.getElementById('next-today-date').addEventListener('click', () => {
+    const nextDate = new Date(selectedTodayDate);
+    nextDate.setDate(nextDate.getDate() + 1);
+    selectTodayDate(nextDate);
+  });
+
+  document.getElementById('today-date-input').addEventListener('change', (event) => {
+    if (event.target.value) selectTodayDate(dateFromKey(event.target.value));
   });
 
   document.getElementById('add-habit-button').addEventListener('click', () => {
@@ -3218,7 +3301,7 @@
 
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=26').catch(() => {
+      navigator.serviceWorker.register('./sw.js?v=27').catch(() => {
         // Offline caching is optional; Bloom remains usable online.
       });
     });

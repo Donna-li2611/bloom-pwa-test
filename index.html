@@ -13,7 +13,7 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="apple-touch-icon" href="./assets/pwa/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="./assets/pwa/bloom-icon-192.png">
-  <link rel="stylesheet" href="./styles.css?v=26">
+  <link rel="stylesheet" href="./styles.css?v=27">
 </head>
 <body>
   <main class="app-shell">
@@ -31,7 +31,17 @@
 
       <section class="habit-section" aria-labelledby="habit-heading">
         <div class="section-heading">
-          <h2 id="habit-heading" data-i18n="today">今天</h2>
+          <div class="today-heading-group">
+            <h2 id="habit-heading" data-i18n="today">今天</h2>
+            <div class="today-date-navigation" aria-label="选择打卡日期">
+              <button id="previous-today-date" type="button" aria-label="前一天">‹</button>
+              <label class="today-date-picker" for="today-date-input">
+                <span id="today-selected-date">今天</span>
+                <input id="today-date-input" type="date" aria-label="打卡日期">
+              </label>
+              <button id="next-today-date" type="button" aria-label="后一天">›</button>
+            </div>
+          </div>
           <span class="section-meta" id="today-recorded-summary"></span>
         </div>
         <div class="habit-list" id="habit-list"></div>
@@ -287,6 +297,6 @@
   </section>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="./app.js?v=26"></script>
+  <script src="./app.js?v=27"></script>
 </body>
 </html>

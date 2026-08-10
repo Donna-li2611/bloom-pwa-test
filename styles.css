@@ -141,10 +141,67 @@ h2 {
 
 .section-heading {
   display: flex;
-  align-items: baseline;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 9px;
+}
+
+.today-heading-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.today-date-navigation {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.today-date-navigation > button,
+.today-date-picker {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--text);
+}
+
+.today-date-navigation > button {
+  width: 34px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.today-date-navigation > button:disabled {
+  opacity: 0.35;
+}
+
+.today-date-picker {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 88px;
+  padding: 0 10px;
+  border-radius: 17px;
+  color: var(--leaf-dark);
+  font-size: 12px;
+  font-weight: 750;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.today-date-picker input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
 }
 
 .section-meta {
@@ -2093,45 +2150,6 @@ h2 {
   margin: 12px 0 6px;
   font-size: 13px;
   font-weight: 800;
-}
-
-.wake-sleep-supplement {
-  display: grid;
-  gap: 10px;
-  margin-top: 16px;
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: var(--surface-soft);
-}
-
-.wake-sleep-supplement > label {
-  font-weight: 800;
-}
-
-.wake-sleep-supplement textarea {
-  width: 100%;
-  min-height: 92px;
-  padding: 12px 14px;
-  resize: vertical;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  color: var(--text);
-  background: white;
-  font: inherit;
-  line-height: 1.55;
-}
-
-.wake-photo-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-}
-
-.wake-photo-row > span {
-  color: var(--text-muted);
-  font-size: 12px;
 }
 
 .dream-ai-card > input,
