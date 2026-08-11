@@ -2437,7 +2437,7 @@
           <p class="reading-status">${token ? '✓ AI 服务已连接' : '请先到“设置”配置 AI 服务'}</p>
           <textarea id="dream-interpretation" class="dream-textarea dream-interpretation" maxlength="5000" placeholder="点击“AI 解读梦境”生成初稿，也可以自己填写……">${escapeHtml(dreamSession.interpretation)}</textarea>
           <div class="dream-title-editor">
-            <input id="dream-record-title" type="text" maxlength="28" value="${escapeHtml(dreamSession.title)}" placeholder="AI 生成标题后可继续修改">
+            <textarea id="dream-record-title" rows="2" maxlength="40" placeholder="AI 生成标题后可继续修改">${escapeHtml(dreamSession.title)}</textarea>
             <button id="dream-title-button" type="button" ${dreamSession.titleLoading ? 'disabled' : ''}>${dreamSession.titleLoading ? '生成中…' : 'AI 生成标题'}</button>
           </div>
           <p class="dream-ai-disclaimer">解读用于自我观察和联想，不代表心理诊断、事实判断或预言。</p>
@@ -3429,7 +3429,7 @@
 
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=29').catch(() => {
+      navigator.serviceWorker.register('./sw.js?v=30').catch(() => {
         // Offline caching is optional; Bloom remains usable online.
       });
     });

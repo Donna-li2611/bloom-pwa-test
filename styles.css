@@ -2269,12 +2269,12 @@ h2 {
 
 .dream-title-editor {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: 9px;
   margin-top: 12px;
 }
 
-.dream-title-editor input,
+.dream-title-editor textarea,
 .dream-title-editor button {
   min-height: 46px;
   border: 1px solid var(--line);
@@ -2282,13 +2282,19 @@ h2 {
   font: inherit;
 }
 
-.dream-title-editor input {
+.dream-title-editor textarea {
+  width: 100%;
   min-width: 0;
   padding: 10px 12px;
   background: white;
+  line-height: 1.5;
+  resize: vertical;
+  overflow-wrap: anywhere;
 }
 
 .dream-title-editor button {
+  width: 100%;
+  min-height: 44px;
   padding: 9px 12px;
   color: var(--green);
   background: var(--green-soft);
