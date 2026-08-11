@@ -13,7 +13,7 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="apple-touch-icon" href="./assets/pwa/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="./assets/pwa/bloom-icon-192.png">
-  <link rel="stylesheet" href="./styles.css?v=27">
+  <link rel="stylesheet" href="./styles.css?v=28">
 </head>
 <body>
   <main class="app-shell">
@@ -137,6 +137,15 @@
         </div>
         <p class="model-settings-copy" data-i18n="modelSettingsHint">选择 Bloom 默认调用的模型。图片识别、阅读感悟、标题和梦境解读会优先使用它。</p>
         <div class="model-settings-list" id="model-settings-list"></div>
+        <div class="ai-access-settings">
+          <label for="settings-ai-token" id="settings-ai-token-label">AI 服务密码</label>
+          <div class="ai-access-row">
+            <input id="settings-ai-token" type="password" autocomplete="off" placeholder="输入 Bloom 测试密码">
+            <button id="save-settings-ai-token" type="button">保存密码</button>
+          </div>
+          <p id="settings-ai-token-status" aria-live="polite"></p>
+          <small id="settings-ai-token-hint">密码只保存在这台设备，不会写入公开网页代码。</small>
+        </div>
         <p class="future-inline" data-i18n="futureModels">后续可添加更多模型，并按任务分别选择。</p>
       </section>
     </section>
@@ -297,6 +306,6 @@
   </section>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="./app.js?v=27"></script>
+  <script src="./app.js?v=28"></script>
 </body>
 </html>

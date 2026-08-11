@@ -906,6 +906,59 @@ h2 {
   gap: 10px;
 }
 
+.ai-access-settings {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.ai-access-settings > label {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.ai-access-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 9px;
+}
+
+.ai-access-row input,
+.ai-access-row button {
+  min-height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  font: inherit;
+}
+
+.ai-access-row input {
+  min-width: 0;
+  padding: 10px 12px;
+  background: var(--surface-soft);
+}
+
+.ai-access-row button {
+  padding: 10px 14px;
+  color: white;
+  background: var(--green);
+  font-weight: 800;
+}
+
+.ai-access-settings p,
+.ai-access-settings small {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ai-access-settings p.is-connected {
+  color: var(--green);
+  font-weight: 800;
+}
+
 .model-setting-option {
   width: 100%;
   min-height: 66px;
@@ -2038,6 +2091,10 @@ h2 {
   cursor: pointer;
 }
 
+.record-entry:not(.has-images) {
+  grid-template-columns: 54px minmax(0, 1fr);
+}
+
 .record-entry-date,
 .record-entry-copy {
   display: flex;
@@ -2143,6 +2200,34 @@ h2 {
 
 .dream-interpretation {
   min-height: 180px;
+}
+
+.dream-title-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.dream-title-editor input,
+.dream-title-editor button {
+  min-height: 46px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  font: inherit;
+}
+
+.dream-title-editor input {
+  min-width: 0;
+  padding: 10px 12px;
+  background: white;
+}
+
+.dream-title-editor button {
+  padding: 9px 12px;
+  color: var(--green);
+  background: var(--green-soft);
+  font-weight: 800;
 }
 
 .dream-token-label {
@@ -2390,6 +2475,10 @@ h2 {
   .record-entry {
     grid-template-columns: 46px minmax(0, 1fr) 64px;
     gap: 9px;
+  }
+
+  .record-entry:not(.has-images) {
+    grid-template-columns: 46px minmax(0, 1fr);
   }
 
   .record-image-stack {

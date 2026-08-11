@@ -636,6 +636,9 @@
       images: Array.isArray(record.images) ? record.images : [],
       imageIds: Array.isArray(record.imageIds) ? record.imageIds : [],
     };
+    if (record.type === 'dream' && /^梦见梦见/.test(record.title || '')) {
+      normalized.title = String(record.title).replace(/^梦见梦见/, '梦见');
+    }
     if (record.type === 'workout') {
       normalized.content = record.content || [record.sourceText, record.summary]
         .filter(Boolean)
@@ -1296,13 +1299,14 @@
   const recordEntryMarkup = (record) => {
     const date = recordDateParts(record.createdAt);
     const summary = record.content || record.summary || record.sourceText || '';
+    const hasImages = recordImageSources(record).length > 0;
     return `
-      <button class="record-entry" type="button" data-record-id="${escapeHtml(record.id)}">
+      <button class="record-entry ${hasImages ? 'has-images' : ''}" type="button" data-record-id="${escapeHtml(record.id)}">
         <span class="record-entry-date"><small>${date.month}</small><strong>${date.day}</strong><small>${date.weekday}</small></span>
         <span class="record-entry-copy">
           <strong>${escapeHtml(record.title || recordFallbackTitle(record))}</strong>
           <span>${escapeHtml(summary)}</span>
-          <small><i class="record-type-dot is-${record.type}"></i>${escapeHtml(recordTypeLabel(record.type))} · ${escapeHtml(recordMetricText(record))}</small>
+          ${record.type === 'dream' ? '' : `<small><i class="record-type-dot is-${record.type}"></i>${escapeHtml(recordTypeLabel(record.type))} · ${escapeHtml(recordMetricText(record))}</small>`}
         </span>
         ${recordImagesMarkup(record)}
       </button>
@@ -1416,6 +1420,29 @@
         </button>
       `;
     }).join('');
+    const configured = Boolean(localStorage.getItem(AI_TOKEN_STORAGE_KEY));
+    const tokenInput = document.getElementById('settings-ai-token');
+    const tokenStatus = document.getElementById('settings-ai-token-status');
+    const tokenLabel = document.getElementById('settings-ai-token-label');
+    const tokenButton = document.getElementById('save-settings-ai-token');
+    const tokenHint = document.getElementById('settings-ai-token-hint');
+    if (tokenInput) {
+      tokenInput.value = '';
+      tokenInput.placeholder = configured
+        ? (state.language === 'zh' ? '已配置；如需更换请重新输入' : 'Configured; enter a new password to replace it')
+        : (state.language === 'zh' ? '输入 Bloom 测试密码' : 'Enter Bloom test password');
+    }
+    if (tokenStatus) {
+      tokenStatus.textContent = configured
+        ? (state.language === 'zh' ? '✓ AI 服务已配置' : '✓ AI service configured')
+        : (state.language === 'zh' ? '尚未配置 AI 服务' : 'AI service is not configured');
+      tokenStatus.classList.toggle('is-connected', configured);
+    }
+    if (tokenLabel) tokenLabel.textContent = state.language === 'zh' ? 'AI 服务密码' : 'AI service password';
+    if (tokenButton) tokenButton.textContent = state.language === 'zh' ? '保存密码' : 'Save password';
+    if (tokenHint) tokenHint.textContent = state.language === 'zh'
+      ? '密码只保存在这台设备，不会写入公开网页代码。'
+      : 'The password is stored only on this device and is not written into the public website code.';
   };
 
   const renderCopy = () => {
@@ -1527,21 +1554,11 @@
           <section class="ai-recognition-panel" id="ai-recognition-panel" hidden>
             <div class="ai-panel-heading">
               <strong>${t().aiImageRecognition}</strong>
-              <span>${t().aiRecognitionHint}</span>
-            </div>
-            <div class="ai-token-fields" id="ai-token-fields">
-              <label for="ai-access-token">${t().aiAccessToken}</label>
-              <input id="ai-access-token" type="password" autocomplete="off" placeholder="${t().aiAccessToken}">
-              <label class="ai-remember-choice">
-                <input id="ai-remember-token" type="checkbox">
-                <span>${t().rememberOnDevice}</span>
-              </label>
-              <small>${t().aiAccessTokenHint}</small>
+              <span>${localStorage.getItem(AI_TOKEN_STORAGE_KEY)
+                ? (state.language === 'zh' ? '使用“设置”中的默认模型' : 'Uses the default model from Settings')
+                : (state.language === 'zh' ? '请先到“设置”配置 AI 服务' : 'Configure AI service in Settings first')}</span>
             </div>
             <div class="ai-controls">
-              <select id="ai-model" aria-label="${t().aiImageRecognition}">
-                ${AI_MODELS.map((model) => `<option value="${model.id}" ${state.defaultAiModel === model.id ? 'selected' : ''}>${state.language === 'zh' ? model.labelZh : model.labelEn}</option>`).join('')}
-              </select>
               <button class="ai-recognize-button" id="ai-recognize-button" type="button">${t().recognizeImage}</button>
             </div>
             <p class="ai-status" id="ai-status" aria-live="polite"></p>
@@ -1648,21 +1665,16 @@
   const analyzeSelectedImage = async (habit) => {
     const status = document.getElementById('ai-status');
     const button = document.getElementById('ai-recognize-button');
-    const tokenInput = document.getElementById('ai-access-token');
-    const remember = document.getElementById('ai-remember-token');
-    const model = document.getElementById('ai-model').value;
-    const token = tokenInput.value.trim();
+    const model = state.defaultAiModel;
+    const token = localStorage.getItem(AI_TOKEN_STORAGE_KEY) || '';
     if (!selectedCheckinImageDataUrl) {
       status.textContent = t().selectPhotoFirst;
       return;
     }
     if (!token) {
-      status.textContent = t().tokenRequired;
-      tokenInput.focus();
+      status.textContent = state.language === 'zh' ? '请先到“设置”配置 AI 服务' : 'Configure AI service in Settings first';
       return;
     }
-    if (remember.checked) localStorage.setItem(AI_TOKEN_STORAGE_KEY, token);
-    else localStorage.removeItem(AI_TOKEN_STORAGE_KEY);
     button.disabled = true;
     button.textContent = t().recognizing;
     status.textContent = t().recognizing;
@@ -1713,18 +1725,6 @@
         }
       });
     }
-    const savedToken = localStorage.getItem(AI_TOKEN_STORAGE_KEY) || '';
-    const tokenInput = document.getElementById('ai-access-token');
-    const remember = document.getElementById('ai-remember-token');
-    if (tokenInput) tokenInput.value = savedToken;
-    if (remember) remember.checked = true;
-    const persistTokenChoice = () => {
-      const token = tokenInput?.value.trim() || '';
-      if (remember?.checked && token) localStorage.setItem(AI_TOKEN_STORAGE_KEY, token);
-      else localStorage.removeItem(AI_TOKEN_STORAGE_KEY);
-    };
-    tokenInput?.addEventListener('change', persistTokenChoice);
-    remember?.addEventListener('change', persistTokenChoice);
     document.getElementById('ai-recognize-button')?.addEventListener('click', () => analyzeSelectedImage(habit));
     const voiceButton = document.getElementById('voice-prototype-button');
     if (voiceButton) {
@@ -1828,10 +1828,7 @@
           <input id="reading-photo-input" type="file" accept="image/*" multiple hidden>
         </section>
         <section class="reading-ai-access">
-          ${token
-            ? '<span class="reading-connected">✓ AI 服务已连接</span>'
-            : '<label for="reading-access-token">Bloom 测试密码</label><input id="reading-access-token" type="password" autocomplete="off">'}
-          <select id="reading-model">${readingModelOptions()}</select>
+          <span class="${token ? 'reading-connected' : ''}">${token ? '✓ AI 服务已连接' : '请先到“设置”配置 AI 服务'}</span>
         </section>
         <p class="reading-status" id="reading-status" aria-live="polite">${readingSession.status || ''}</p>
         <button class="reading-primary-button" type="button" data-reading-action="ocr" ${readingSession.images.length ? '' : 'disabled'}>
@@ -1926,12 +1923,18 @@
   const requestRecordTitle = async ({ type, sourceText, reflection, metrics, model }) => {
     const token = localStorage.getItem(AI_TOKEN_STORAGE_KEY) || '';
     if (!token) throw new Error('未连接 AI 服务');
-    const response = await fetch(`${AI_ENDPOINT}/api/record/title`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Bloom-Access-Token': token },
-      body: JSON.stringify({ type, sourceText, reflection, metrics, model }),
-    });
-    const payload = await response.json().catch(() => ({}));
+    const requestTitle = async (requestType) => {
+      const response = await fetch(`${AI_ENDPOINT}/api/record/title`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Bloom-Access-Token': token },
+        body: JSON.stringify({ type: requestType, sourceText, reflection, metrics, model }),
+      });
+      return { response, payload: await response.json().catch(() => ({})) };
+    };
+    let { response, payload } = await requestTitle(type);
+    if (type === 'dream' && response.status === 400) {
+      ({ response, payload } = await requestTitle('reading'));
+    }
     if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
     return String(payload.title || '').trim();
   };
@@ -1948,7 +1951,7 @@
     renderReadingPreview(false);
     try {
       const title = await requestRecordTitle({
-        type: 'reading',
+        type: 'dream',
         sourceText: readingSession.confirmedSource || confirmCompleteReadingSource(),
         reflection: readingSession.reflection,
         metrics: `${readingSession.minutes} 分钟，${readingSession.pages} 页`,
@@ -2030,18 +2033,14 @@
   };
 
   const getReadingToken = () => {
-    const input = document.getElementById('reading-access-token');
-    const token = input?.value.trim() || localStorage.getItem(AI_TOKEN_STORAGE_KEY) || '';
-    if (input && token) localStorage.setItem(AI_TOKEN_STORAGE_KEY, token);
-    return token;
+    return localStorage.getItem(AI_TOKEN_STORAGE_KEY) || '';
   };
 
   const runReadingOcr = async () => {
     const token = getReadingToken();
     if (!token) {
-      readingSession.status = '请先输入 Bloom 测试密码';
+      readingSession.status = '请先到“设置”配置 AI 服务';
       renderReadingPhotos();
-      document.getElementById('reading-access-token')?.focus();
       return;
     }
     if (!readingSession.images.length) return;
@@ -2081,7 +2080,7 @@
     const completeSource = confirmCompleteReadingSource();
     const token = getReadingToken();
     if (!token) {
-      readingSession.status = '请先回到图片页输入 Bloom 测试密码';
+      readingSession.status = '请先到“设置”配置 AI 服务';
       renderReadingReflection();
       return;
     }
@@ -2301,7 +2300,6 @@
       }
     };
     elements.fields.onchange = async (event) => {
-      if (event.target.id === 'reading-model') readingSession.model = event.target.value;
       if (event.target.id === 'reading-minutes') readingSession.minutes = Number(event.target.value);
       if (event.target.id === 'reading-pages') readingSession.pages = Number(event.target.value);
       if (event.target.id === 'reading-photo-input') {
@@ -2324,8 +2322,51 @@
   const fallbackDreamTitle = (dreamText) => {
     const concise = String(dreamText || '').replace(/\s+/g, ' ').trim();
     if (!concise) return '昨夜的梦境';
-    const opening = concise.split(/[。！？!?；;]/)[0].replace(/^我梦见/, '').trim();
+    const opening = concise.split(/[。！？!?；;]/)[0]
+      .replace(/^(?:我(?:好像|似乎)?梦见|我梦到|梦见|梦到)/, '')
+      .trim();
     return opening ? `梦见${opening}`.slice(0, 24) : '昨夜的梦境';
+  };
+
+  const syncDreamInputs = () => {
+    dreamSession.dreamText = document.getElementById('dream-text')?.value.trim() || dreamSession.dreamText;
+    dreamSession.interpretation = document.getElementById('dream-interpretation')?.value || dreamSession.interpretation;
+    const titleInput = document.getElementById('dream-record-title');
+    if (titleInput) dreamSession.title = titleInput.value.trim();
+    dreamSession.model = state.defaultAiModel;
+  };
+
+  const runDreamTitle = async () => {
+    syncDreamInputs();
+    if (!dreamSession.dreamText) {
+      dreamSession.status = '请先写下梦境内容';
+      renderDreamCheckin();
+      return;
+    }
+    if (!localStorage.getItem(AI_TOKEN_STORAGE_KEY)) {
+      dreamSession.status = '请先到“设置”配置 AI 服务';
+      renderDreamCheckin();
+      return;
+    }
+    dreamSession.titleLoading = true;
+    dreamSession.status = 'AI 正在生成梦境标题…';
+    renderDreamCheckin();
+    try {
+      const title = await requestRecordTitle({
+        type: 'reading',
+        sourceText: dreamSession.dreamText,
+        reflection: dreamSession.interpretation,
+        metrics: '梦境记录',
+        model: state.defaultAiModel,
+      });
+      if (title) dreamSession.title = title;
+      dreamSession.status = '已生成标题，你仍可以修改';
+    } catch (error) {
+      dreamSession.status = `标题生成失败：${error.message}`;
+    } finally {
+      dreamSession.titleLoading = false;
+      renderDreamCheckin();
+    }
   };
 
   const renderDreamCheckin = () => {
@@ -2343,14 +2384,12 @@
             <div><strong>AI 解读</strong><small>生成后可以继续修改，最终保存的是你确认的版本</small></div>
             <button id="dream-interpret-button" type="button" ${dreamSession.loading ? 'disabled' : ''}>${dreamSession.loading ? '解读中…' : 'AI 解读梦境'}</button>
           </div>
-          ${token ? '' : `
-            <label class="dream-token-label" for="dream-access-token">Bloom 测试密码</label>
-            <input id="dream-access-token" type="password" autocomplete="off" placeholder="输入后只保存在这台设备">
-          `}
-          <select id="dream-model" aria-label="梦境解读模型">
-            ${AI_MODELS.map((model) => `<option value="${model.id}" ${dreamSession.model === model.id ? 'selected' : ''}>${state.language === 'zh' ? model.labelZh : model.labelEn}</option>`).join('')}
-          </select>
+          <p class="reading-status">${token ? '✓ AI 服务已连接' : '请先到“设置”配置 AI 服务'}</p>
           <textarea id="dream-interpretation" class="dream-textarea dream-interpretation" maxlength="5000" placeholder="点击“AI 解读梦境”生成初稿，也可以自己填写……">${escapeHtml(dreamSession.interpretation)}</textarea>
+          <div class="dream-title-editor">
+            <input id="dream-record-title" type="text" maxlength="28" value="${escapeHtml(dreamSession.title)}" placeholder="AI 生成标题后可继续修改">
+            <button id="dream-title-button" type="button" ${dreamSession.titleLoading ? 'disabled' : ''}>${dreamSession.titleLoading ? '生成中…' : 'AI 生成标题'}</button>
+          </div>
           <p class="dream-ai-disclaimer">解读用于自我观察和联想，不代表心理诊断、事实判断或预言。</p>
           <p class="reading-status" id="dream-status" aria-live="polite">${escapeHtml(dreamSession.status)}</p>
         </section>
@@ -2363,16 +2402,14 @@
     document.querySelector('#checkin-form > .save-button').textContent = '保存梦境记录';
     document.getElementById('dream-text').addEventListener('input', (event) => { dreamSession.dreamText = event.target.value; });
     document.getElementById('dream-interpretation').addEventListener('input', (event) => { dreamSession.interpretation = event.target.value; });
-    document.getElementById('dream-model').addEventListener('change', (event) => { dreamSession.model = event.target.value; });
+    document.getElementById('dream-record-title').addEventListener('input', (event) => { dreamSession.title = event.target.value; });
     document.getElementById('dream-interpret-button').addEventListener('click', runDreamInterpretation);
+    document.getElementById('dream-title-button').addEventListener('click', runDreamTitle);
   };
 
   const runDreamInterpretation = async () => {
-    dreamSession.dreamText = document.getElementById('dream-text')?.value.trim() || dreamSession.dreamText;
-    dreamSession.interpretation = document.getElementById('dream-interpretation')?.value || dreamSession.interpretation;
-    dreamSession.model = document.getElementById('dream-model')?.value || dreamSession.model;
-    const tokenInput = document.getElementById('dream-access-token');
-    const token = tokenInput?.value.trim() || localStorage.getItem(AI_TOKEN_STORAGE_KEY) || '';
+    syncDreamInputs();
+    const token = localStorage.getItem(AI_TOKEN_STORAGE_KEY) || '';
     if (!dreamSession.dreamText) {
       dreamSession.status = '请先写下梦境内容';
       renderDreamCheckin();
@@ -2380,12 +2417,10 @@
       return;
     }
     if (!token) {
-      dreamSession.status = '请先输入 Bloom 测试密码';
+      dreamSession.status = '请先到“设置”配置 AI 服务';
       renderDreamCheckin();
-      document.getElementById('dream-access-token')?.focus();
       return;
     }
-    if (tokenInput) localStorage.setItem(AI_TOKEN_STORAGE_KEY, token);
     dreamSession.loading = true;
     dreamSession.status = 'AI 正在阅读完整梦境…';
     renderDreamCheckin();
@@ -2401,11 +2436,24 @@
       }
       if (response.status === 401) {
         localStorage.removeItem(AI_TOKEN_STORAGE_KEY);
-        throw new Error('测试密码无效或已失效，请重新输入当前测试密码');
+        throw new Error('测试密码无效或已失效，请到“设置”重新配置');
       }
       if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
       dreamSession.interpretation = String(payload.interpretation || '').trim();
-      dreamSession.status = '已生成解读初稿，你可以继续修改';
+      dreamSession.status = '已生成解读初稿，正在生成标题…';
+      try {
+        const title = await requestRecordTitle({
+          type: 'dream',
+          sourceText: dreamSession.dreamText,
+          reflection: dreamSession.interpretation,
+          metrics: '梦境记录',
+          model: state.defaultAiModel,
+        });
+        if (title) dreamSession.title = title;
+        dreamSession.status = '已生成解读和标题，你都可以继续修改';
+      } catch {
+        dreamSession.status = '已生成解读；标题暂未生成，可点击按钮重试';
+      }
     } catch (error) {
       dreamSession.status = `解读失败：${error.message}`;
     } finally {
@@ -2415,8 +2463,9 @@
   };
 
   const saveDreamRecord = (habit) => {
-    dreamSession.dreamText = document.getElementById('dream-text')?.value.trim() || dreamSession.dreamText.trim();
-    dreamSession.interpretation = document.getElementById('dream-interpretation')?.value.trim() || dreamSession.interpretation.trim();
+    syncDreamInputs();
+    dreamSession.dreamText = dreamSession.dreamText.trim();
+    dreamSession.interpretation = dreamSession.interpretation.trim();
     if (!dreamSession.dreamText) {
       dreamSession.status = '请先写下梦境内容';
       renderDreamCheckin();
@@ -2435,7 +2484,7 @@
       id: recordId,
       type: 'dream',
       habitId: habit.id,
-      title: fallbackDreamTitle(dreamSession.dreamText),
+      title: dreamSession.title || fallbackDreamTitle(dreamSession.dreamText),
       summary: dreamSession.interpretation,
       sourceText: dreamSession.dreamText,
       images: existingRecord?.images || [],
@@ -2540,12 +2589,15 @@
       setupReadingFlow();
       return;
     } else if (habit.kind === 'dream') {
+      const existingDreamRecord = state.records.find((record) => record.id === todayEntry?.recordId);
       dreamSession = {
         dreamText: todayEntry?.dreamText || '',
         interpretation: todayEntry?.interpretation || '',
         recordId: todayEntry?.recordId || '',
+        title: existingDreamRecord?.title || '',
         model: state.defaultAiModel,
         loading: false,
+        titleLoading: false,
         status: '',
       };
       openLayer(elements.sheet);
@@ -3027,6 +3079,19 @@
     showToast(state.language === 'zh' ? '默认模型已更新' : 'Default model updated');
   });
 
+  document.getElementById('save-settings-ai-token').addEventListener('click', () => {
+    const input = document.getElementById('settings-ai-token');
+    const token = input.value.trim();
+    if (!token) {
+      showToast(state.language === 'zh' ? '请输入新的 AI 服务密码' : 'Enter a new AI service password');
+      input.focus();
+      return;
+    }
+    localStorage.setItem(AI_TOKEN_STORAGE_KEY, token);
+    renderModelSettings();
+    showToast(state.language === 'zh' ? 'AI 服务密码已保存在本机' : 'AI service password saved on this device');
+  });
+
   elements.recordSections.addEventListener('click', (event) => {
     const entry = event.target.closest('[data-record-id]');
     if (entry) openRecordDetail(entry.dataset.recordId);
@@ -3301,7 +3366,7 @@
 
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=27').catch(() => {
+      navigator.serviceWorker.register('./sw.js?v=28').catch(() => {
         // Offline caching is optional; Bloom remains usable online.
       });
     });
