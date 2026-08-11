@@ -697,7 +697,8 @@
   let state = loadState();
   let selectedTodayDate = new Date();
   let activeHabitId = null;
-  let selectedCheckinImageDataUrl = '';
+  let selectedCheckinImages = [];
+  let selectedCheckinImageId = '';
   let aiRecognitionResults = new Map();
   let readingSession = null;
   let pendingWorkoutSession = null;
@@ -789,6 +790,8 @@
       entry.interpretation = details.interpretation || '';
       entry.recordId = details.recordId || '';
     }
+    if (Array.isArray(details.images)) entry.images = details.images;
+    if (Array.isArray(details.imageIds)) entry.imageIds = details.imageIds;
     state.history[date][habit.id] = entry;
   };
   const ratio = (habit) => {
@@ -1546,11 +1549,14 @@
         <div class="note-composer">
           <textarea class="note-textarea" id="record-note" placeholder="${notePlaceholder}">${habit.note || ''}</textarea>
           <div class="note-actions">
-            <label class="attachment-button" for="record-photo">▧ ${t().photo}</label>
-            <input id="record-photo" type="file" accept="image/*" hidden>
+            <label class="attachment-button" for="record-photo">▧ ${t().photo}（最多 9 张）</label>
+            <input id="record-photo" type="file" accept="image/*" multiple hidden>
             <button class="voice-prototype-button" id="voice-prototype-button" type="button">◉ ${t().voice}</button>
           </div>
-          <img class="attachment-preview" id="attachment-preview" alt="" hidden>
+          <div class="optional-photo-heading" id="optional-photo-heading" hidden>
+            <span>已选择图片</span><strong id="record-photo-count">0 / 9</strong>
+          </div>
+          <div class="optional-photo-grid" id="optional-photo-grid" hidden></div>
           <section class="ai-recognition-panel" id="ai-recognition-panel" hidden>
             <div class="ai-panel-heading">
               <strong>${t().aiImageRecognition}</strong>
@@ -1592,6 +1598,31 @@
   const resultValue = (result) => {
     if (!Array.isArray(result?.values)) return null;
     return result.values.find((item) => Number.isFinite(Number(item?.value)));
+  };
+
+  const activeCheckinImage = () => selectedCheckinImages.find((image) => image.id === selectedCheckinImageId)
+    || selectedCheckinImages[0]
+    || null;
+
+  const renderOptionalPhotoGrid = () => {
+    const grid = document.getElementById('optional-photo-grid');
+    const heading = document.getElementById('optional-photo-heading');
+    const count = document.getElementById('record-photo-count');
+    if (!grid || !heading || !count) return;
+    heading.hidden = selectedCheckinImages.length === 0;
+    grid.hidden = selectedCheckinImages.length === 0;
+    count.textContent = `${selectedCheckinImages.length} / 9`;
+    grid.innerHTML = selectedCheckinImages.map((image, index) => `
+      <article class="optional-photo-card ${activeCheckinImage()?.id === image.id ? 'is-selected' : ''}">
+        <button class="optional-photo-select" type="button" data-checkin-image-action="select" data-image-id="${image.id}" aria-label="选择图片 ${index + 1} 用于 AI 识别">
+          <img src="${image.dataUrl}" alt="上传图片 ${index + 1}">
+          <span>${index + 1}</span>
+        </button>
+        <button class="optional-photo-remove" type="button" data-checkin-image-action="remove" data-image-id="${image.id}" aria-label="删除图片 ${index + 1}">×</button>
+      </article>
+    `).join('');
+    const input = document.getElementById('record-photo');
+    if (input) input.disabled = selectedCheckinImages.length >= 9;
   };
 
   const renderAiResults = (habit) => {
@@ -1667,7 +1698,8 @@
     const button = document.getElementById('ai-recognize-button');
     const model = state.defaultAiModel;
     const token = localStorage.getItem(AI_TOKEN_STORAGE_KEY) || '';
-    if (!selectedCheckinImageDataUrl) {
+    const selectedImage = activeCheckinImage();
+    if (!selectedImage) {
       status.textContent = t().selectPhotoFirst;
       return;
     }
@@ -1688,7 +1720,7 @@
         body: JSON.stringify({
           model,
           context: habitName(habit),
-          imageDataUrl: selectedCheckinImageDataUrl,
+          imageDataUrl: selectedImage.dataUrl,
         }),
       });
       const payload = await response.json().catch(() => ({}));
@@ -1708,23 +1740,41 @@
     const photoInput = document.getElementById('record-photo');
     if (photoInput) {
       photoInput.addEventListener('change', async () => {
-        const file = photoInput.files?.[0];
-        if (!file) return;
-        const preview = document.getElementById('attachment-preview');
-        preview.src = URL.createObjectURL(file);
-        preview.hidden = false;
+        const available = 9 - selectedCheckinImages.length;
+        const files = [...(photoInput.files || [])].slice(0, available);
+        if (!files.length) return;
         const panel = document.getElementById('ai-recognition-panel');
         const status = document.getElementById('ai-status');
         panel.hidden = false;
         status.textContent = '';
-        try {
-          selectedCheckinImageDataUrl = await fileToCompressedDataUrl(file);
-        } catch {
-          selectedCheckinImageDataUrl = '';
-          status.textContent = t().recognitionFailed;
+        for (const file of files) {
+          try {
+            const dataUrl = await fileToCompressedDataUrl(file);
+            const image = { id: `checkin-photo-${Date.now()}-${selectedCheckinImages.length}`, dataUrl };
+            selectedCheckinImages.push(image);
+            selectedCheckinImageId = image.id;
+          } catch {
+            status.textContent = state.language === 'zh' ? '有一张图片无法读取' : 'One photo could not be read';
+          }
         }
+        photoInput.value = '';
+        renderOptionalPhotoGrid();
       });
     }
+    document.getElementById('optional-photo-grid')?.addEventListener('click', (event) => {
+      const action = event.target.closest('[data-checkin-image-action]');
+      if (!action) return;
+      const imageId = action.dataset.imageId;
+      if (action.dataset.checkinImageAction === 'remove') {
+        selectedCheckinImages = selectedCheckinImages.filter((image) => image.id !== imageId);
+        if (selectedCheckinImageId === imageId) selectedCheckinImageId = selectedCheckinImages[0]?.id || '';
+      } else {
+        selectedCheckinImageId = imageId;
+      }
+      renderOptionalPhotoGrid();
+      const panel = document.getElementById('ai-recognition-panel');
+      if (panel) panel.hidden = selectedCheckinImages.length === 0;
+    });
     document.getElementById('ai-recognize-button')?.addEventListener('click', () => analyzeSelectedImage(habit));
     const voiceButton = document.getElementById('voice-prototype-button');
     if (voiceButton) {
@@ -2520,7 +2570,8 @@
     formSaveButton.textContent = t().saveRecord;
     pendingWorkoutSession = null;
     dreamSession = null;
-    selectedCheckinImageDataUrl = '';
+    selectedCheckinImages = [];
+    selectedCheckinImageId = '';
     aiRecognitionResults = new Map();
     const isCurrentDate = selectedDateKey() === localDateKey(new Date());
     const checkinDateLabel = new Intl.DateTimeFormat(state.language === 'zh' ? 'zh-CN' : 'en-US', {
@@ -2670,7 +2721,7 @@
             <div><strong>运动记录预览</strong><small>${escapeHtml(session.activityType)} · ${session.minutes} 分钟</small></div>
             <span>未保存</span>
           </div>
-          ${session.image ? `<div class="record-detail-images"><button type="button" id="workout-preview-image"><img src="${escapeHtml(session.image)}" alt="运动记录图片"></button></div>` : ''}
+          ${session.images.length ? `<div class="record-detail-images">${session.images.map((image, index) => `<button type="button" data-workout-preview-image="${index}" aria-label="放大运动图片 ${index + 1}"><img src="${escapeHtml(image)}" alt="运动记录图片 ${index + 1}"></button>`).join('')}</div>` : ''}
           <div class="reading-record-section">
             <strong>身体感受/训练内容</strong>
             <p>${escapeHtml(session.note || '尚未填写文字')}</p>
@@ -2705,7 +2756,9 @@
         renderWorkoutTitleConfirmation(habit);
       }
     });
-    document.getElementById('workout-preview-image')?.addEventListener('click', () => showRecordLightbox(session.image));
+    elements.fields.querySelectorAll('[data-workout-preview-image]').forEach((button) => {
+      button.addEventListener('click', () => showRecordLightbox(session.images[Number(button.dataset.workoutPreviewImage)]));
+    });
   };
 
   const commitWorkoutCheckin = async (habit) => {
@@ -2731,7 +2784,7 @@
     const storedMedia = await persistRecordImages(
       recordId,
       'workout',
-      session.image ? [session.image] : [],
+      session.images,
     );
     habit.minutes += session.minutes;
     habit.actual += habit.recorded ? 0 : 1;
@@ -2806,12 +2859,12 @@
       const minutes = Number(document.getElementById('workout-minutes').value);
       const activityType = selectedWorkoutActivity();
       const note = document.getElementById('record-note')?.value.trim() || '';
-      if (note || selectedCheckinImageDataUrl) {
+      if (note || selectedCheckinImages.length) {
         pendingWorkoutSession = {
           minutes,
           activityType,
           note,
-          image: selectedCheckinImageDataUrl,
+          images: selectedCheckinImages.map((image) => image.dataUrl),
           title: fallbackRecordTitle('workout', activityType, note, activityType),
           titleStatus: '',
           titleLoading: false,
@@ -2851,10 +2904,20 @@
     if (!wasComplete && habit.complete) habit.weekDone = Math.min(habit.weekTarget, habit.weekDone + 1);
     if (wasComplete && !habit.complete) habit.weekDone = Math.max(0, habit.weekDone - 1);
     habit.weekStates[todayWeekIndex()] = habit.complete ? 'complete' : habit.recorded ? 'recorded' : 'none';
+    if (selectedCheckinImages.length) {
+      const storedMedia = await persistRecordImages(
+        `checkin-${habit.id}-${selectedDateKey()}`,
+        habit.kind,
+        selectedCheckinImages.map((image) => image.dataUrl),
+      );
+      historyDetails.images = storedMedia.images;
+      historyDetails.imageIds = storedMedia.imageIds;
+    }
     recordTodayInHistory(habit, habit.kind === 'workout'
       ? {
         minutes: Number(document.getElementById('workout-minutes')?.value) || 0,
         activityType: selectedWorkoutActivity(),
+        ...historyDetails,
       }
       : historyDetails);
     persist();
@@ -3366,7 +3429,7 @@
 
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=28').catch(() => {
+      navigator.serviceWorker.register('./sw.js?v=29').catch(() => {
         // Offline caching is optional; Bloom remains usable online.
       });
     });
