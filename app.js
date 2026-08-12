@@ -1480,17 +1480,14 @@
     const selectedKey = selectedDateKey();
     const actualTodayKey = localDateKey(new Date());
     const isToday = selectedKey === actualTodayKey;
-    const selectedLabel = new Intl.DateTimeFormat(state.language === 'zh' ? 'zh-CN' : 'en-US', {
-      month: 'numeric', day: 'numeric', ...(isToday ? {} : { weekday: 'short' }),
-    }).format(selectedTodayDate);
     document.getElementById('habit-heading').textContent = isToday
       ? t().today
-      : state.language === 'zh' ? '补打卡' : 'Backfill';
-    document.getElementById('today-selected-date').textContent = selectedLabel;
+      : new Intl.DateTimeFormat(state.language === 'zh' ? 'zh-CN' : 'en-US', {
+        month: state.language === 'zh' ? 'long' : 'short', day: 'numeric',
+      }).format(selectedTodayDate);
     const dateInput = document.getElementById('today-date-input');
     dateInput.value = selectedKey;
     dateInput.max = actualTodayKey;
-    document.getElementById('next-today-date').disabled = selectedKey >= actualTodayKey;
     const quotes = state.language === 'zh'
       ? ['慢慢来，你正在成为自己喜欢的样子。', '每一次真实记录，都是在认真照顾自己。', '今天不必完美，只需要继续。']
       : ['Take your time. You are becoming someone you like.', 'Every honest record is a way of caring for yourself.', 'Today does not need to be perfect. Just keep going.'];
@@ -2420,7 +2417,6 @@
   };
 
   const renderDreamCheckin = () => {
-    const token = localStorage.getItem(AI_TOKEN_STORAGE_KEY) || '';
     elements.fields.innerHTML = `
       <div class="dream-flow">
         <section class="dream-editor-card">
@@ -2430,22 +2426,19 @@
           <textarea id="dream-text" class="dream-textarea" maxlength="8000" placeholder="我梦见……">${escapeHtml(dreamSession.dreamText)}</textarea>
         </section>
         <section class="dream-editor-card dream-ai-card">
-          <div class="reading-section-head">
-            <div><strong>AI 解读</strong><small>生成后可以继续修改，最终保存的是你确认的版本</small></div>
-            <button id="dream-interpret-button" type="button" ${dreamSession.loading ? 'disabled' : ''}>${dreamSession.loading ? '解读中…' : 'AI 解读梦境'}</button>
-          </div>
-          <p class="reading-status">${token ? '✓ AI 服务已连接' : '请先到“设置”配置 AI 服务'}</p>
-          <textarea id="dream-interpretation" class="dream-textarea dream-interpretation" maxlength="5000" placeholder="点击“AI 解读梦境”生成初稿，也可以自己填写……">${escapeHtml(dreamSession.interpretation)}</textarea>
+          <button class="dream-field-trigger" id="dream-interpret-trigger" type="button" ${dreamSession.loading ? 'disabled' : ''}>
+            <span><strong>AI 解读</strong><small>点击这里生成；生成后可以继续修改</small></span>
+          </button>
+          <textarea id="dream-interpretation" class="dream-textarea dream-interpretation" maxlength="5000" placeholder="点击“AI 解读”生成初稿，也可以自己填写……">${escapeHtml(dreamSession.interpretation)}</textarea>
+        </section>
+        <section class="dream-editor-card dream-title-card">
+          <strong>生成标题</strong>
+          <small>AI 解读时同步生成，也可以自己修改</small>
           <div class="dream-title-editor">
             <textarea id="dream-record-title" rows="2" maxlength="40" placeholder="AI 生成标题后可继续修改">${escapeHtml(dreamSession.title)}</textarea>
-            <button id="dream-title-button" type="button" ${dreamSession.titleLoading ? 'disabled' : ''}>${dreamSession.titleLoading ? '生成中…' : 'AI 生成标题'}</button>
           </div>
           <p class="dream-ai-disclaimer">解读用于自我观察和联想，不代表心理诊断、事实判断或预言。</p>
           <p class="reading-status" id="dream-status" aria-live="polite">${escapeHtml(dreamSession.status)}</p>
-        </section>
-        <section class="dream-future-card">
-          <span aria-hidden="true">✦</span>
-          <div><strong>梦境画面</strong><small>未来可让 AI 根据梦境生成一张专属图片；本次暂不上传或生成图片。</small></div>
         </section>
       </div>
     `;
@@ -2453,8 +2446,10 @@
     document.getElementById('dream-text').addEventListener('input', (event) => { dreamSession.dreamText = event.target.value; });
     document.getElementById('dream-interpretation').addEventListener('input', (event) => { dreamSession.interpretation = event.target.value; });
     document.getElementById('dream-record-title').addEventListener('input', (event) => { dreamSession.title = event.target.value; });
-    document.getElementById('dream-interpret-button').addEventListener('click', runDreamInterpretation);
-    document.getElementById('dream-title-button').addEventListener('click', runDreamTitle);
+    document.getElementById('dream-interpret-trigger').addEventListener('click', runDreamInterpretation);
+    document.getElementById('dream-interpretation').addEventListener('click', () => {
+      if (!dreamSession.interpretation && !dreamSession.loading) runDreamInterpretation();
+    });
   };
 
   const runDreamInterpretation = async () => {
@@ -2502,7 +2497,7 @@
         if (title) dreamSession.title = title;
         dreamSession.status = '已生成解读和标题，你都可以继续修改';
       } catch {
-        dreamSession.status = '已生成解读；标题暂未生成，可点击按钮重试';
+        dreamSession.status = '已生成解读；标题暂未生成，可再次点击“AI 解读”重试';
       }
     } catch (error) {
       dreamSession.status = `解读失败：${error.message}`;
@@ -3142,17 +3137,59 @@
     showToast(state.language === 'zh' ? '默认模型已更新' : 'Default model updated');
   });
 
-  document.getElementById('save-settings-ai-token').addEventListener('click', () => {
+  document.getElementById('save-settings-ai-token').addEventListener('click', async () => {
     const input = document.getElementById('settings-ai-token');
+    const button = document.getElementById('save-settings-ai-token');
+    const status = document.getElementById('settings-ai-token-status');
     const token = input.value.trim();
     if (!token) {
       showToast(state.language === 'zh' ? '请输入新的 AI 服务密码' : 'Enter a new AI service password');
       input.focus();
       return;
     }
-    localStorage.setItem(AI_TOKEN_STORAGE_KEY, token);
-    renderModelSettings();
-    showToast(state.language === 'zh' ? 'AI 服务密码已保存在本机' : 'AI service password saved on this device');
+    button.disabled = true;
+    button.textContent = state.language === 'zh' ? '验证中…' : 'Verifying…';
+    status.textContent = state.language === 'zh' ? '正在验证密码…' : 'Verifying password…';
+    status.classList.remove('is-connected', 'is-error');
+    try {
+      const response = await fetch(`${AI_ENDPOINT}/api/dream/interpret`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Bloom-Access-Token': token },
+        body: JSON.stringify({ model: state.defaultAiModel, dreamText: '' }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      const authenticated = response.ok
+        || (response.status === 400 && String(payload.error || '').includes('请先写下梦境内容'));
+      if (!authenticated) {
+        if ([401, 403].includes(response.status)) throw new Error('PASSWORD_INVALID');
+        throw new Error(payload.error || `HTTP ${response.status}`);
+      }
+      localStorage.setItem(AI_TOKEN_STORAGE_KEY, token);
+      renderModelSettings();
+      const verifiedStatus = document.getElementById('settings-ai-token-status');
+      verifiedStatus.textContent = state.language === 'zh'
+        ? '✓ 密码验证成功，AI 服务已连接'
+        : '✓ Password verified. AI service connected';
+      verifiedStatus.classList.add('is-connected');
+      showToast(state.language === 'zh' ? '密码验证成功' : 'Password verified');
+    } catch (error) {
+      const invalidPassword = error.message === 'PASSWORD_INVALID';
+      status.textContent = invalidPassword
+        ? (state.language === 'zh' ? '密码错误，请重新输入' : 'Incorrect password. Please try again')
+        : (state.language === 'zh' ? `验证失败：${error.message}` : `Verification failed: ${error.message}`);
+      status.classList.add('is-error');
+      showToast(invalidPassword
+        ? (state.language === 'zh' ? '密码错误，未保存' : 'Incorrect password. Not saved')
+        : (state.language === 'zh' ? '暂时无法验证密码' : 'Unable to verify password'));
+      input.focus();
+      input.select();
+    } finally {
+      const currentButton = document.getElementById('save-settings-ai-token');
+      if (currentButton) {
+        currentButton.disabled = false;
+        currentButton.textContent = state.language === 'zh' ? '保存密码' : 'Save password';
+      }
+    }
   });
 
   elements.recordSections.addEventListener('click', (event) => {
@@ -3177,18 +3214,6 @@
     state.language = state.language === 'zh' ? 'en' : 'zh';
     persist();
     renderAll();
-  });
-
-  document.getElementById('previous-today-date').addEventListener('click', () => {
-    const previousDate = new Date(selectedTodayDate);
-    previousDate.setDate(previousDate.getDate() - 1);
-    selectTodayDate(previousDate);
-  });
-
-  document.getElementById('next-today-date').addEventListener('click', () => {
-    const nextDate = new Date(selectedTodayDate);
-    nextDate.setDate(nextDate.getDate() + 1);
-    selectTodayDate(nextDate);
   });
 
   document.getElementById('today-date-input').addEventListener('change', (event) => {
@@ -3429,7 +3454,7 @@
 
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=30').catch(() => {
+      navigator.serviceWorker.register('./sw.js?v=31').catch(() => {
         // Offline caching is optional; Bloom remains usable online.
       });
     });

@@ -160,38 +160,31 @@ h2 {
   gap: 5px;
 }
 
-.today-date-navigation > button,
 .today-date-picker {
-  min-height: 34px;
+  width: 36px;
+  height: 36px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.82);
   color: var(--text);
-}
-
-.today-date-navigation > button {
-  width: 34px;
-  padding: 0;
-  border-radius: 50%;
-  font-size: 22px;
-  line-height: 1;
-}
-
-.today-date-navigation > button:disabled {
-  opacity: 0.35;
 }
 
 .today-date-picker {
   position: relative;
   display: grid;
   place-items: center;
-  min-width: 88px;
-  padding: 0 10px;
-  border-radius: 17px;
+  flex: 0 0 36px;
+  padding: 0;
+  border-radius: 50%;
   color: var(--leaf-dark);
-  font-size: 12px;
-  font-weight: 750;
-  white-space: nowrap;
   overflow: hidden;
+}
+
+.today-date-caret {
+  margin-top: -4px;
+  font-size: 25px;
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: none;
 }
 
 .today-date-picker input {
@@ -2239,14 +2232,50 @@ h2 {
   background: #fbf8ec;
 }
 
-.dream-ai-card .reading-section-head button {
-  min-height: 40px;
-  padding: 8px 11px;
+.dream-field-trigger {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0;
   border: 0;
-  border-radius: 13px;
-  color: white;
-  background: var(--green);
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dream-field-trigger strong,
+.dream-title-card strong {
+  display: block;
+}
+
+.dream-field-trigger small,
+.dream-title-card small {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.dream-field-trigger::after {
+  content: "点击生成";
+  flex: 0 0 auto;
+  padding-top: 2px;
+  color: var(--green);
+  font-size: 12px;
   font-weight: 800;
+}
+
+.dream-field-trigger:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.dream-field-trigger:disabled::after {
+  content: "生成中…";
 }
 
 .dream-textarea {
@@ -2268,14 +2297,10 @@ h2 {
 }
 
 .dream-title-editor {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 9px;
   margin-top: 12px;
 }
 
-.dream-title-editor textarea,
-.dream-title-editor button {
+.dream-title-editor textarea {
   min-height: 46px;
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -2290,15 +2315,6 @@ h2 {
   line-height: 1.5;
   resize: vertical;
   overflow-wrap: anywhere;
-}
-
-.dream-title-editor button {
-  width: 100%;
-  min-height: 44px;
-  padding: 9px 12px;
-  color: var(--green);
-  background: var(--green-soft);
-  font-weight: 800;
 }
 
 .dream-token-label {
@@ -2563,6 +2579,27 @@ h2 {
   .record-title-row button {
     min-height: 42px;
   }
+}
+
+/* iPhone 15 Pro logical viewport: 393 × 852. */
+@media (max-width: 393px) {
+  .app-shell {
+    width: 100%;
+  }
+
+  .checkin-sheet,
+  .habit-sheet {
+    max-height: calc(100dvh - env(safe-area-inset-top) - 12px);
+  }
+
+  .dream-editor-card {
+    padding: 16px;
+  }
+}
+
+#settings-ai-token-status.is-error {
+  color: #b84f49;
+  font-weight: 750;
 }
 
 @media (prefers-reduced-motion: reduce) {
