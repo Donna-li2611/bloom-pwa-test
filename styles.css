@@ -330,10 +330,14 @@ h2 {
 }
 
 @media (max-width: 430px) {
+  .hero {
+    margin-top: 22px;
+  }
+
   .habit-card {
     grid-template-columns: 42px minmax(50px, 70px) minmax(112px, 1fr) 42px;
     gap: 8px;
-    padding: 14px 12px;
+    padding: 12px;
   }
 
   .habit-icon,
