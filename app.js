@@ -62,6 +62,30 @@
     sleep: 'sleep', wake: 'wake_up', workout: 'workout', reading: 'reading',
     weight: 'weight', footbath: 'foot_bath', dream: 'dream_journal',
   };
+  const defaultWeeklyTargetById = { workout: 3, footbath: 4 };
+  const normalizeFrequencyForHabit = (habit) => {
+    const frequency = habit.frequency && typeof habit.frequency === 'object'
+      ? { ...habit.frequency }
+      : { type: 'daily' };
+    if (frequency.type === 'weekly') {
+      const fallback = defaultWeeklyTargetById[habit.id] || Number(habit.weekTarget) || 1;
+      frequency.count = Math.max(1, Math.round(Number(frequency.count) || fallback));
+    }
+    if (frequency.type === 'weekdays') {
+      frequency.days = Array.isArray(frequency.days) ? frequency.days : [];
+    }
+    if (frequency.type === 'interval') {
+      frequency.days = Math.max(1, Math.round(Number(frequency.days) || 2));
+    }
+    return frequency;
+  };
+  const frequencyTargetForHabit = (habit) => {
+    const frequency = normalizeFrequencyForHabit(habit);
+    if (frequency.type === 'weekly') return frequency.count;
+    if (frequency.type === 'weekdays') return Math.max(1, frequency.days.length);
+    if (frequency.type === 'interval') return Math.max(1, Math.round(7 / frequency.days));
+    return 7;
+  };
   const weekdayKeys = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
   const bedtimeHistory = ['23:18', '23:42', '23:25', '23:08', '23:51', '23:22', '23:42'];
   const wakeHistory = ['06:54', '07:12', '06:48', '06:58', '07:18', '06:51', '06:52'];
@@ -657,12 +681,15 @@
           const habitKey = habit.habitKey || defaultHabitKeyById[habit.id] || habit.id;
           const translation = resolveHabitTranslation(habit.sourceName || habit.name)
             || HABIT_TRANSLATIONS.find((item) => item.key === habitKey);
+          const frequency = normalizeFrequencyForHabit(habit);
           return {
             ...habit,
             habitKey: translation?.key || habitKey,
             sourceName: habit.sourceName || habit.name || '',
             nameZh: habit.nameZh || translation?.zh || '',
             nameEn: habit.nameEn || translation?.en || '',
+            frequency,
+            weekTarget: frequencyTargetForHabit({ ...habit, frequency }),
             recordOptions: habit.recordOptions || { text: false, photo: false, voice: false },
           };
         });
@@ -796,7 +823,7 @@
   };
   const ratio = (habit) => {
     const progress = currentWeekProgress(habit);
-    return Math.min(1, progress.complete / Math.max(1, progress.target));
+    return Math.min(1, progress.recorded / Math.max(1, progress.target));
   };
   const habitName = (habit) => {
     const localizedName = state.language === 'zh' ? habit.nameZh : habit.nameEn;
@@ -898,15 +925,13 @@
   };
 
   const habitRatioLabel = (habit) => {
-    if (habit.kind === 'reading') return `${habit.minutes} / ${habit.target}`;
-    if (habit.kind === 'custom' && habit.quantified && habit.frequency.type === 'daily') return `${habit.value || 0} / ${habit.target}`;
     const progress = currentWeekProgress(habit);
     if (habit.kind === 'time') {
       return state.language === 'zh'
         ? `记录 ${progress.recorded} · 达标 ${progress.complete}/${progress.target}`
         : `${progress.recorded} logged · ${progress.complete}/${progress.target} on plan`;
     }
-    return `${progress.complete} / ${progress.target}`;
+    return `${progress.recorded} / ${progress.target}`;
   };
 
   const statusSymbol = (habit) => habit.complete ? '✓' : habit.recorded ? '•' : '+';
@@ -924,7 +949,7 @@
           <span class="habit-ratio">${habitRatioLabel(habit)}</span>
         </div>
         <div class="habit-copy">
-          <div class="progress-track"><div class="progress-fill" style="width:${Math.round(habit.kind === 'reading' ? habit.minutes / habit.target * 100 : ratio(habit) * 100)}%"></div></div>
+          <div class="progress-track"><div class="progress-fill" style="width:${Math.round(ratio(habit) * 100)}%"></div></div>
           <span class="habit-detail">${habitDetail(habit)}</span>
         </div>
         <button class="checkin-button ${statusClass(habit)}" type="button" data-checkin="${habit.id}" aria-label="${habitName(habit)}">${statusSymbol(habit)}</button>
@@ -982,7 +1007,7 @@
     return {
       recorded: statuses.filter((status) => status !== 'none').length,
       complete: statuses.filter((status) => status === 'complete').length,
-      target: habit.weekTarget,
+      target: frequencyTargetForHabit(habit),
     };
   };
 
@@ -1398,7 +1423,7 @@
         <span class="habit-icon">${iconMarkup(habit.icon)}</span>
         <div>
           <span class="managed-habit-name">${habitName(habit)}</span>
-          <span class="managed-habit-meta">${habit.hidden ? (state.language === 'zh' ? '已从今天隐藏 · ' : 'Hidden from Today · ') : ''}${formatFrequency(habit.frequency)} · ${habit.kind === 'custom' ? (habit.quantified ? t().quantified(t().metricLabels[habit.metricType]) : t().simpleCheckin) : t().trackingLabels[habit.id]}</span>
+          <span class="managed-habit-meta">${habit.hidden ? (state.language === 'zh' ? '已从今天隐藏 · ' : 'Hidden from Today · ') : ''}${formatFrequency(normalizeFrequencyForHabit(habit))} · ${habit.kind === 'custom' ? (habit.quantified ? t().quantified(t().metricLabels[habit.metricType]) : t().simpleCheckin) : t().trackingLabels[habit.id]}</span>
         </div>
         <div class="habit-actions">
           <button class="edit-habit-button" type="button" data-habit-menu="${habit.id}" aria-label="习惯操作">•••</button>
