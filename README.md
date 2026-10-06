@@ -1,5 +1,7 @@
 # Bloom · Earlier Web/PWA Interaction Prototype
 
+**A self-directed personal project, initiated and developed by Xiaozhen Li (Donna).** I carry out the project's design, research and development myself, using AI tools in the workflow.
+
 **This is a separate, earlier product-exploration build.**
 
 For the main portfolio case, product decisions, current public code scope and verification records, start with **[Bloom · Habit & Life Tracker](https://github.com/Donna-li2611/bloom-daily-habit-tracker)**.
@@ -15,6 +17,8 @@ The detailed feature list below describes this prototype version. Prototype hist
 ---
 
 ## 中文定位
+
+**这是我个人独立开展的产品原型，设计与制作由我本人完成，过程中使用AI工具辅助。**
 
 这是Bloom早期的Web/PWA交互验证版本，作为产品探索过程保留。**正式作品集介绍请先看[主作品库](https://github.com/Donna-li2611/bloom-daily-habit-tracker)**，其中集中整理产品取舍、公开代码范围与验证记录。
 
