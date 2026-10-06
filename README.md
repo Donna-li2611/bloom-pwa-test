@@ -1,3 +1,27 @@
+# Bloom · Earlier Web/PWA Interaction Prototype
+
+**This is a separate, earlier product-exploration build.**
+
+For the main portfolio case, product decisions, current public code scope and verification records, start with **[Bloom · Habit & Life Tracker](https://github.com/Donna-li2611/bloom-daily-habit-tracker)**.
+
+This repository is retained to show the Web/PWA interaction exploration. It contains demonstration data and should not be read as the current iPhone application, a production service or evidence of real-user outcomes. AI-backed actions depend on their configured services.
+
+The detailed feature list below describes this prototype version. Prototype history is preserved; this README refresh does not upgrade or change its executable behaviour.
+
+[Portfolio home](https://github.com/Donna-li2611)
+
+**README reviewed: 2026-10-06.**
+
+---
+
+## 中文定位
+
+这是Bloom早期的Web/PWA交互验证版本，作为产品探索过程保留。**正式作品集介绍请先看[主作品库](https://github.com/Donna-li2611/bloom-daily-habit-tracker)**，其中集中整理产品取舍、公开代码范围与验证记录。
+
+这里的示例数据不代表真实用户结果，功能清单对应此原型版本，也不代表当前iPhone版本。此次仅整理说明，不改动原型功能。
+
+---
+
 # Bloom 产品原型 v0.2
 
 这是 Bloom 的可点击 Web/PWA 产品体验原型，用来验证界面、信息结构和核心操作，不是正式应用。
